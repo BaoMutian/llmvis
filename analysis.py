@@ -240,10 +240,25 @@ def compute_attention_entropy(attention_weights: np.ndarray) -> float:
     Returns:
         注意力熵
     """
+    # 处理空数组或全零情况
+    if attention_weights is None or len(attention_weights) == 0:
+        return 0.0
+    
     weights = np.clip(attention_weights, 1e-10, 1.0)
+    weight_sum = weights.sum()
+    
+    # 处理 sum 为 0 或 NaN 的情况
+    if weight_sum == 0 or np.isnan(weight_sum):
+        return 0.0
+    
     # 确保归一化
-    weights = weights / weights.sum()
+    weights = weights / weight_sum
     entropy = -np.sum(weights * np.log(weights))
+    
+    # 确保返回有效值
+    if np.isnan(entropy) or np.isinf(entropy):
+        return 0.0
+    
     return float(entropy)
 
 

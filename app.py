@@ -321,9 +321,14 @@ def get_attention_head_entropy():
                 entropy = analysis.compute_attention_entropy(attn_weights)
                 entropies.append(entropy)
 
+            mean_entropy = float(np.mean(entropies)) if entropies else 0.0
+            # 确保没有 NaN/Inf 值
+            if np.isnan(mean_entropy) or np.isinf(mean_entropy):
+                mean_entropy = 0.0
+            
             head_entropies.append({
                 "head_idx": head_idx,
-                "mean_entropy": float(np.mean(entropies)),
+                "mean_entropy": mean_entropy,
                 "entropies": entropies if step_idx is not None else None
             })
 
