@@ -28,25 +28,13 @@ const chartInstances = {
 };
 
 /**
- * 初始化所有图表
+ * 初始化所有图表（仅初始化当前可见的 attention 图表）
  */
 function initCharts() {
+    // 只初始化默认可见的 attention 图表
     const attentionContainer = document.getElementById('attentionChart');
-    const probsContainer = document.getElementById('probsChart');
-    const entropyContainer = document.getElementById('entropyChart');
-    const confidenceContainer = document.getElementById('confidenceChart');
-    
     if (attentionContainer) {
         chartInstances.attention = echarts.init(attentionContainer, null, { renderer: 'canvas' });
-    }
-    if (probsContainer) {
-        chartInstances.probs = echarts.init(probsContainer, null, { renderer: 'canvas' });
-    }
-    if (entropyContainer) {
-        chartInstances.entropy = echarts.init(entropyContainer, null, { renderer: 'canvas' });
-    }
-    if (confidenceContainer) {
-        chartInstances.confidence = echarts.init(confidenceContainer, null, { renderer: 'canvas' });
     }
     
     // 窗口大小变化时自动调整
@@ -58,11 +46,35 @@ function initCharts() {
 }
 
 /**
+ * 确保图表实例已初始化
+ */
+function ensureChartInit(chartName) {
+    if (chartInstances[chartName]) {
+        return chartInstances[chartName];
+    }
+    
+    const containerMap = {
+        attention: 'attentionChart',
+        probs: 'probsChart',
+        entropy: 'entropyChart',
+        confidence: 'confidenceChart'
+    };
+    
+    const container = document.getElementById(containerMap[chartName]);
+    if (container && container.offsetWidth > 0) {
+        chartInstances[chartName] = echarts.init(container, null, { renderer: 'canvas' });
+        return chartInstances[chartName];
+    }
+    
+    return null;
+}
+
+/**
  * 渲染注意力热力图
  * @param {Object} data - 注意力数据
  */
 function renderAttentionHeatmap(data) {
-    const chart = chartInstances.attention;
+    let chart = ensureChartInit('attention');
     if (!chart) return;
     
     const { attention_matrix, x_labels, y_labels, layer, head, statistics } = data;
@@ -191,8 +203,13 @@ function renderAttentionHeatmap(data) {
  * @param {Object} data - 概率分布数据
  */
 function renderProbsChart(data) {
-    const chart = chartInstances.probs;
-    if (!chart) return;
+    // 延迟初始化图表
+    let chart = ensureChartInit('probs');
+    if (!chart) {
+        // 如果还是无法初始化，稍后重试
+        setTimeout(() => renderProbsChart(data), 100);
+        return;
+    }
     
     const { position, actual_token, top_k_tokens, distribution_analysis } = data;
     
@@ -310,8 +327,11 @@ function renderProbsChart(data) {
  * @param {Object} data - 熵数据
  */
 function renderEntropyChart(data) {
-    const chart = chartInstances.entropy;
-    if (!chart) return;
+    let chart = ensureChartInit('entropy');
+    if (!chart) {
+        setTimeout(() => renderEntropyChart(data), 100);
+        return;
+    }
     
     const { entropies_bits, generated_tokens, mean_entropy, std_entropy } = data;
     
@@ -446,8 +466,11 @@ function renderEntropyChart(data) {
  * @param {Object} data - 置信度数据
  */
 function renderConfidenceChart(data) {
-    const chart = chartInstances.confidence;
-    if (!chart) return;
+    let chart = ensureChartInit('confidence');
+    if (!chart) {
+        setTimeout(() => renderConfidenceChart(data), 100);
+        return;
+    }
     
     const { confidence_curve, generated_tokens } = data;
     
