@@ -121,7 +121,8 @@ class ModelService:
         temperature: float = 0.7,
         top_k: int = 50,
         top_p: float = 0.9,
-        max_tokens: int = 128
+        max_tokens: int = 128,
+        mode: str = 'chat'
     ) -> Dict[str, Any]:
         """
         执行推理并返回详细信息（注意力、logits等）
@@ -132,6 +133,7 @@ class ModelService:
             top_k: top-k采样参数
             top_p: top-p采样参数
             max_tokens: 最大生成token数
+            mode: 生成模式 ('chat' 或 'completion')
             
         Returns:
             包含生成结果和详细分析数据的字典
@@ -139,15 +141,19 @@ class ModelService:
         if not self.is_loaded():
             raise RuntimeError("Model not loaded")
         
-        # 构建对话格式
-        messages = [{"role": "user", "content": prompt}]
-        
-        # 使用 chat template
-        text = self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
-        )
+        # 根据模式构建输入文本
+        if mode == 'chat':
+            # 构建对话格式
+            messages = [{"role": "user", "content": prompt}]
+            # 使用 chat template
+            text = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+        else:
+            # completion 模式：直接使用原始 prompt
+            text = prompt
         
         # 编码输入
         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
@@ -270,7 +276,8 @@ class ModelService:
                 "temperature": temperature,
                 "top_k": top_k,
                 "top_p": top_p,
-                "max_tokens": max_tokens
+                "max_tokens": max_tokens,
+                "mode": mode
             }
         }
     

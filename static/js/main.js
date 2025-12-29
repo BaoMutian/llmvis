@@ -48,6 +48,7 @@ const Elements = {
     topPValue: null,
     maxTokens: null,
     maxTokensValue: null,
+    inferenceMode: null,
     
     // 可视化参数
     topNProbs: null,
@@ -120,6 +121,7 @@ function initElements() {
     Elements.topPValue = document.getElementById('topPValue');
     Elements.maxTokens = document.getElementById('maxTokens');
     Elements.maxTokensValue = document.getElementById('maxTokensValue');
+    Elements.inferenceMode = document.getElementById('inferenceMode');
     
     Elements.topNProbs = document.getElementById('topNProbs');
     Elements.topNProbsValue = document.getElementById('topNProbsValue');
@@ -510,7 +512,8 @@ async function handleGenerate() {
             temperature: parseFloat(Elements.temperature.value),
             top_k: parseInt(Elements.topK.value),
             top_p: parseFloat(Elements.topP.value),
-            max_tokens: parseInt(Elements.maxTokens.value)
+            max_tokens: parseInt(Elements.maxTokens.value),
+            mode: Elements.inferenceMode.value
         };
         
         const result = await API.generate(params);

@@ -112,6 +112,7 @@ def generate():
     top_k = int(data.get("top_k", 50))
     top_p = float(data.get("top_p", 0.9))
     max_tokens = int(data.get("max_tokens", 128))
+    mode = data.get("mode", "chat")  # 'chat' 或 'completion'
 
     try:
         # 执行推理
@@ -120,7 +121,8 @@ def generate():
             temperature=temperature,
             top_k=top_k,
             top_p=top_p,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
+            mode=mode
         )
 
         # 分析生成结果
