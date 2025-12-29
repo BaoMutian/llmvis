@@ -276,9 +276,11 @@ def analyze_token_probability_distribution(
     tokens_for_90 = int(np.searchsorted(cumsum, 0.9) + 1)
     tokens_for_99 = int(np.searchsorted(cumsum, 0.99) + 1)
     
-    # 峰度和偏度
-    kurtosis = float(stats.kurtosis(probs))
-    skewness = float(stats.skew(probs))
+    # 峰度和偏度（处理 Infinity 和 NaN）
+    kurtosis_raw = stats.kurtosis(probs)
+    skewness_raw = stats.skew(probs)
+    kurtosis = 0.0 if (np.isnan(kurtosis_raw) or np.isinf(kurtosis_raw)) else float(kurtosis_raw)
+    skewness = 0.0 if (np.isnan(skewness_raw) or np.isinf(skewness_raw)) else float(skewness_raw)
     
     return {
         "entropy": entropy,
