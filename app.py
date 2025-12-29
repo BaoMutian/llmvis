@@ -30,21 +30,38 @@ def index():
 @app.route("/api/model/load", methods=["POST"])
 def load_model():
     """加载模型"""
-    global MODEL_PATH
+    global MODEL_PATH, latest_result
 
     data = request.json or {}
     model_path = data.get("model_path", MODEL_PATH)
-
-    if model_service.is_loaded():
+    
+    # 展开用户目录
+    model_path = os.path.expanduser(model_path)
+    
+    # 检查路径是否存在
+    if not os.path.exists(model_path):
+        return jsonify({
+            "success": False,
+            "message": f"Model path does not exist: {model_path}"
+        }), 400
+    
+    # 如果已加载相同模型，直接返回
+    if model_service.is_loaded() and model_service.model_path == model_path:
         return jsonify({
             "success": True,
             "message": "Model already loaded",
             "model_info": model_service.get_model_info()
         })
+    
+    # 如果要切换模型，先卸载当前模型
+    if model_service.is_loaded():
+        model_service.unload_model()
+        latest_result = None  # 清除旧的推理结果
 
     success = model_service.load_model(model_path)
 
     if success:
+        MODEL_PATH = model_path
         return jsonify({
             "success": True,
             "message": "Model loaded successfully",

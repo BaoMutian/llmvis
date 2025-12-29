@@ -24,6 +24,13 @@ const Elements = {
     modelStatus: null,
     loadingOverlay: null,
     
+    // 模型
+    modelPath: null,
+    loadModelBtn: null,
+    infoLayers: null,
+    infoHeads: null,
+    infoHidden: null,
+    
     // 输入
     promptInput: null,
     generateBtn: null,
@@ -77,6 +84,12 @@ function initElements() {
     Elements.modelStatus = document.getElementById('modelStatus');
     Elements.loadingOverlay = document.getElementById('loadingOverlay');
     
+    Elements.modelPath = document.getElementById('modelPath');
+    Elements.loadModelBtn = document.getElementById('loadModelBtn');
+    Elements.infoLayers = document.getElementById('infoLayers');
+    Elements.infoHeads = document.getElementById('infoHeads');
+    Elements.infoHidden = document.getElementById('infoHidden');
+    
     Elements.promptInput = document.getElementById('promptInput');
     Elements.generateBtn = document.getElementById('generateBtn');
     
@@ -120,6 +133,9 @@ function initElements() {
  * 设置事件监听
  */
 function setupEventListeners() {
+    // 模型加载按钮
+    Elements.loadModelBtn.addEventListener('click', handleLoadModel);
+    
     // 生成按钮
     Elements.generateBtn.addEventListener('click', handleGenerate);
     
@@ -306,6 +322,71 @@ function updateModelStatus(status, text) {
 }
 
 /**
+ * 更新模型信息显示
+ */
+function updateModelInfo(info) {
+    if (info) {
+        Elements.infoLayers.textContent = info.num_layers || '-';
+        Elements.infoHeads.textContent = info.num_attention_heads || '-';
+        Elements.infoHidden.textContent = info.hidden_size || '-';
+        
+        // 更新应用状态
+        AppState.numLayers = info.num_layers;
+        AppState.numHeads = info.num_attention_heads;
+        
+        // 更新滑块范围
+        updateLayerSliderMax();
+    } else {
+        Elements.infoLayers.textContent = '-';
+        Elements.infoHeads.textContent = '-';
+        Elements.infoHidden.textContent = '-';
+    }
+}
+
+/**
+ * 处理模型加载
+ */
+async function handleLoadModel() {
+    const modelPath = Elements.modelPath.value.trim();
+    
+    if (!modelPath) {
+        alert('请输入模型路径');
+        return;
+    }
+    
+    try {
+        Elements.loadModelBtn.disabled = true;
+        updateModelStatus('loading', '加载模型中...');
+        showLoading(true, '正在加载模型，这可能需要几分钟...');
+        
+        const response = await API.loadModel(modelPath);
+        
+        if (response.success) {
+            AppState.modelLoaded = true;
+            updateModelInfo(response.model_info);
+            updateModelStatus('ready', '模型就绪');
+            
+            // 清空之前的结果
+            AppState.generationResult = null;
+            AppState.selectedTokenIndex = null;
+            Elements.tokenDisplay.innerHTML = '<div class="placeholder-text">输入提示并点击"生成"按钮开始推理</div>';
+            Elements.selectedTokenInfo.style.display = 'none';
+            Charts.clearAllCharts();
+        } else {
+            throw new Error(response.message);
+        }
+        
+    } catch (error) {
+        console.error('Model loading error:', error);
+        updateModelStatus('error', '加载失败');
+        alert('模型加载失败: ' + error.message);
+    } finally {
+        Elements.loadModelBtn.disabled = false;
+        showLoading(false);
+    }
+}
+
+/**
  * 检查并加载模型
  */
 async function checkAndLoadModel() {
@@ -317,27 +398,33 @@ async function checkAndLoadModel() {
         
         if (infoResponse.loaded) {
             AppState.modelLoaded = true;
-            AppState.numLayers = infoResponse.info.num_layers;
-            AppState.numHeads = infoResponse.info.num_attention_heads;
+            updateModelInfo(infoResponse.info);
             updateModelStatus('ready', '模型就绪');
-            updateLayerSliderMax();
+            
+            // 更新输入框显示当前模型路径
+            if (infoResponse.info.model_path) {
+                Elements.modelPath.value = infoResponse.info.model_path;
+            }
             return;
         }
         
-        // 未加载，尝试加载
-        updateModelStatus('loading', '加载模型中...');
-        showLoading(true, '正在加载模型，这可能需要几分钟...');
-        
-        const loadResponse = await API.loadModel();
-        
-        if (loadResponse.success) {
-            AppState.modelLoaded = true;
-            AppState.numLayers = loadResponse.model_info.num_layers;
-            AppState.numHeads = loadResponse.model_info.num_attention_heads;
-            updateModelStatus('ready', '模型就绪');
-            updateLayerSliderMax();
+        // 未加载，尝试加载默认模型
+        const defaultPath = Elements.modelPath.value.trim();
+        if (defaultPath) {
+            updateModelStatus('loading', '加载模型中...');
+            showLoading(true, '正在加载模型，这可能需要几分钟...');
+            
+            const loadResponse = await API.loadModel(defaultPath);
+            
+            if (loadResponse.success) {
+                AppState.modelLoaded = true;
+                updateModelInfo(loadResponse.model_info);
+                updateModelStatus('ready', '模型就绪');
+            } else {
+                throw new Error(loadResponse.message);
+            }
         } else {
-            throw new Error(loadResponse.message);
+            updateModelStatus('error', '请输入模型路径');
         }
         
     } catch (error) {

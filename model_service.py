@@ -84,6 +84,22 @@ class ModelService:
         """检查模型是否已加载"""
         return self.model is not None and self.tokenizer is not None
     
+    def unload_model(self):
+        """卸载当前模型，释放显存"""
+        if self.model is not None:
+            del self.model
+            self.model = None
+        if self.tokenizer is not None:
+            del self.tokenizer
+            self.tokenizer = None
+        self.model_path = None
+        
+        # 清理 GPU 缓存
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        print("Model unloaded and GPU memory cleared.")
+    
     def get_model_info(self) -> Dict[str, Any]:
         """获取模型信息"""
         if not self.is_loaded():

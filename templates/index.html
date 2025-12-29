@@ -24,6 +24,28 @@
         <main class="main-content">
             <!-- 左侧面板：输入与参数 -->
             <aside class="left-panel">
+                <section class="panel-section model-section">
+                    <h2 class="section-title">模型</h2>
+                    <div class="model-path-input">
+                        <input 
+                            type="text" 
+                            id="modelPath" 
+                            class="text-input"
+                            placeholder="输入模型路径..."
+                            value="~/evo/models/qwen3-4b-instruct-2507"
+                        >
+                        <button id="loadModelBtn" class="btn btn-secondary">
+                            <span class="btn-icon">⟳</span>
+                            加载
+                        </button>
+                    </div>
+                    <div id="modelInfo" class="model-info">
+                        <span class="info-item"><span class="info-label">层数:</span> <span id="infoLayers">-</span></span>
+                        <span class="info-item"><span class="info-label">注意力头:</span> <span id="infoHeads">-</span></span>
+                        <span class="info-item"><span class="info-label">隐藏维度:</span> <span id="infoHidden">-</span></span>
+                    </div>
+                </section>
+
                 <section class="panel-section">
                     <h2 class="section-title">输入</h2>
                     <textarea 
