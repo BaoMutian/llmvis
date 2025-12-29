@@ -179,7 +179,7 @@ html, body {
 /* Main Content Layout */
 .main-content {
     display: grid;
-    grid-template-columns: 280px 1fr 8px minmax(300px, 520px);
+    grid-template-columns: 280px 1fr 8px minmax(300px, calc(100vw - 400px));
     gap: 0;
     padding: var(--spacing-md);
     flex: 1;

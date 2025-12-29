@@ -169,7 +169,9 @@ function setupResizeHandle() {
         if (!isResizing) return;
         
         const deltaX = startX - e.clientX;
-        const newWidth = Math.max(300, Math.min(800, startWidth + deltaX));
+        // 最大宽度为窗口宽度减去左侧面板和最小中间区域
+        const maxWidth = window.innerWidth - 280 - 100 - 16; // 左侧280 + 最小中间区100 + 间隙
+        const newWidth = Math.max(300, Math.min(maxWidth, startWidth + deltaX));
         
         // 更新 grid 布局
         mainContent.style.gridTemplateColumns = `280px 1fr 8px ${newWidth}px`;
