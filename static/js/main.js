@@ -17,7 +17,7 @@ const AppState = {
     numLayers: 36,
     numHeads: 32,
     embeddingDims: 2,  // Embedding 投影维度 (2 或 3)
-    tokenColorMode: 'entropy',  // Token 颜色模式: none, entropy, probability, logit
+    tokenColorMode: 'default',  // Token 颜色模式: default, entropy, probability, logit
     entropySortMode: 'position',  // 熵排序模式: position, desc, asc
     entropyPercentile: 75  // 高熵阈值百分位数
 };
@@ -545,7 +545,14 @@ function getTokenColorClass(idx, result) {
     const mode = AppState.tokenColorMode;
     const { analysis } = result;
     
-    if (mode === 'none') return '';
+    if (mode === 'default') {
+        // 默认模式：只高亮非最高概率的 token（采样选择了非 top1 的情况）
+        const confidence = analysis.confidence_curve[idx];
+        if (confidence && confidence.is_top1 === false) {
+            return 'not-top1';  // 标记未选择最高概率 token
+        }
+        return '';
+    }
     
     if (mode === 'entropy') {
         const { entropies, max_entropy, min_entropy } = analysis;

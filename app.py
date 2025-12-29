@@ -133,8 +133,8 @@ def generate():
             result["generated_token_ids"]
         )
 
-        # 获取置信度曲线
-        confidence_curve = analysis.get_confidence_curve(logits_list)
+        # 获取置信度曲线（包含是否选择了最高概率 token 的标记）
+        confidence_curve = analysis.get_confidence_curve(logits_list, result["generated_token_ids"])
 
         # 存储结果供后续查询
         latest_result = result

@@ -353,12 +353,16 @@ def compute_layer_similarity(
     return similarity_matrix
 
 
-def get_confidence_curve(logits_list: List[np.ndarray]) -> List[Dict[str, Any]]:
+def get_confidence_curve(
+    logits_list: List[np.ndarray],
+    generated_token_ids: List[int] = None
+) -> List[Dict[str, Any]]:
     """
     获取生成过程的置信度曲线
     
     Args:
         logits_list: 每个位置的logits列表
+        generated_token_ids: 实际生成的token ID列表
         
     Returns:
         置信度数据列表
@@ -367,7 +371,15 @@ def get_confidence_curve(logits_list: List[np.ndarray]) -> List[Dict[str, Any]]:
     
     for idx, logits in enumerate(logits_list):
         probs = softmax(logits)
-        sorted_probs = np.sort(probs)[::-1]
+        sorted_indices = np.argsort(probs)[::-1]
+        sorted_probs = probs[sorted_indices]
+        
+        # 检查实际生成的 token 是否是最高概率的 token
+        is_top1 = True
+        if generated_token_ids is not None and idx < len(generated_token_ids):
+            actual_token_id = generated_token_ids[idx]
+            top1_token_id = sorted_indices[0]
+            is_top1 = (actual_token_id == top1_token_id)
         
         results.append({
             "position": idx,
@@ -375,7 +387,8 @@ def get_confidence_curve(logits_list: List[np.ndarray]) -> List[Dict[str, Any]]:
             "second_prob": float(sorted_probs[1]) if len(sorted_probs) > 1 else 0,
             "prob_gap": float(sorted_probs[0] - sorted_probs[1]) if len(sorted_probs) > 1 else float(sorted_probs[0]),
             "top_3_sum": float(sorted_probs[:3].sum()),
-            "top_5_sum": float(sorted_probs[:5].sum())
+            "top_5_sum": float(sorted_probs[:5].sum()),
+            "is_top1": is_top1  # 是否选择了最高概率的 token
         })
     
     return results
