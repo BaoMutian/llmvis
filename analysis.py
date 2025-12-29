@@ -378,8 +378,8 @@ def get_confidence_curve(
         is_top1 = True
         if generated_token_ids is not None and idx < len(generated_token_ids):
             actual_token_id = generated_token_ids[idx]
-            top1_token_id = sorted_indices[0]
-            is_top1 = (actual_token_id == top1_token_id)
+            top1_token_id = int(sorted_indices[0])  # 转换为 Python int
+            is_top1 = bool(actual_token_id == top1_token_id)  # 转换为 Python bool
         
         results.append({
             "position": idx,
