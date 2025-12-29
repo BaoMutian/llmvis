@@ -21,33 +21,64 @@ const CHART_COLORS = {
 
 // 图表实例管理
 const chartInstances = {
+    // 注意力分析组
     attention: null,
+    multihead: null,
+    headEntropy: null,
+    // 隐藏状态分析组
+    hiddenSimilarity: null,
+    residual: null,
+    logitsLens: null,
+    // Token分析组
     probs: null,
+    embedding: null,
+    activation: null,
+    // 归因分析组
     entropy: null,
-    confidence: null
+    confidence: null,
+    attribution: null
 };
 
 /**
  * 初始化所有图表
  */
 function initCharts() {
+    // 注意力分析组
     const attentionContainer = document.getElementById('attentionChart');
+    const multiheadContainer = document.getElementById('multiheadChart');
+    const headEntropyContainer = document.getElementById('headEntropyChart');
+    
+    // 隐藏状态分析组
+    const hiddenSimilarityContainer = document.getElementById('hiddenSimilarityChart');
+    const residualContainer = document.getElementById('residualChart');
+    const logitsLensContainer = document.getElementById('logitsLensChart');
+    
+    // Token分析组
     const probsContainer = document.getElementById('probsChart');
+    const embeddingContainer = document.getElementById('embeddingChart');
+    const activationContainer = document.getElementById('activationChart');
+    
+    // 归因分析组
     const entropyContainer = document.getElementById('entropyChart');
     const confidenceContainer = document.getElementById('confidenceChart');
+    const attributionContainer = document.getElementById('attributionChart');
     
-    if (attentionContainer) {
-        chartInstances.attention = echarts.init(attentionContainer, null, { renderer: 'canvas' });
-    }
-    if (probsContainer) {
-        chartInstances.probs = echarts.init(probsContainer, null, { renderer: 'canvas' });
-    }
-    if (entropyContainer) {
-        chartInstances.entropy = echarts.init(entropyContainer, null, { renderer: 'canvas' });
-    }
-    if (confidenceContainer) {
-        chartInstances.confidence = echarts.init(confidenceContainer, null, { renderer: 'canvas' });
-    }
+    // 初始化图表实例
+    if (attentionContainer) chartInstances.attention = echarts.init(attentionContainer, null, { renderer: 'canvas' });
+    if (multiheadContainer) chartInstances.multihead = echarts.init(multiheadContainer, null, { renderer: 'canvas' });
+    if (headEntropyContainer) chartInstances.headEntropy = echarts.init(headEntropyContainer, null, { renderer: 'canvas' });
+    
+    if (hiddenSimilarityContainer) chartInstances.hiddenSimilarity = echarts.init(hiddenSimilarityContainer, null, { renderer: 'canvas' });
+    if (residualContainer) chartInstances.residual = echarts.init(residualContainer, null, { renderer: 'canvas' });
+    if (logitsLensContainer) chartInstances.logitsLens = echarts.init(logitsLensContainer, null, { renderer: 'canvas' });
+    
+    if (probsContainer) chartInstances.probs = echarts.init(probsContainer, null, { renderer: 'canvas' });
+    if (embeddingContainer) chartInstances.embedding = echarts.init(embeddingContainer, null, { renderer: 'canvas' });
+    if (activationContainer) chartInstances.activation = echarts.init(activationContainer, null, { renderer: 'canvas' });
+    
+    if (entropyContainer) chartInstances.entropy = echarts.init(entropyContainer, null, { renderer: 'canvas' });
+    if (confidenceContainer) chartInstances.confidence = echarts.init(confidenceContainer, null, { renderer: 'canvas' });
+    if (attributionContainer) chartInstances.attribution = echarts.init(attributionContainer, null, { renderer: 'canvas' });
     
     // 窗口大小变化时自动调整
     window.addEventListener('resize', () => {

@@ -7,7 +7,13 @@ const AppState = {
     modelLoaded: false,
     generationResult: null,
     selectedTokenIndex: null,
-    currentTab: 'attention',
+    currentGroup: 'attention',  // 当前一级标签组
+    currentTabs: {              // 每个组当前的二级标签
+        attention: 'attention-heatmap',
+        hidden: 'hidden-similarity',
+        token: 'token-probs',
+        attribution: 'attr-entropy'
+    },
     numLayers: 36,
     numHeads: 32
 };
@@ -52,9 +58,11 @@ const Elements = {
     selectedPosition: null,
     selectedEntropy: null,
     
-    // 标签页
-    tabBtns: null,
-    tabContents: null,
+    // 标签页 - 分组结构
+    tabGroupBtns: null,      // 一级标签按钮
+    tabGroups: null,         // 标签组容器
+    tabSecondaryBtns: null,  // 二级标签按钮
+    tabContents: null,       // 内容区域
     
     // 布局
     mainContent: null,
@@ -98,7 +106,9 @@ function initElements() {
     Elements.selectedPosition = document.getElementById('selectedPosition');
     Elements.selectedEntropy = document.getElementById('selectedEntropy');
     
-    Elements.tabBtns = document.querySelectorAll('.tab-btn');
+    Elements.tabGroupBtns = document.querySelectorAll('.tab-btn-primary');
+    Elements.tabGroups = document.querySelectorAll('.tab-group');
+    Elements.tabSecondaryBtns = document.querySelectorAll('.tab-btn-secondary');
     Elements.tabContents = document.querySelectorAll('.tab-content');
     
     Elements.mainContent = document.querySelector('.main-content');
@@ -124,9 +134,14 @@ function setupEventListeners() {
     // 注意力头选择
     Elements.attentionHead.addEventListener('change', handleAttentionHeadChange);
     
-    // 标签页切换
-    Elements.tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    // 一级标签组切换
+    Elements.tabGroupBtns.forEach(btn => {
+        btn.addEventListener('click', () => switchGroup(btn.dataset.group));
+    });
+    
+    // 二级标签切换
+    Elements.tabSecondaryBtns.forEach(btn => {
+        btn.addEventListener('click', () => switchSecondaryTab(btn.dataset.tab));
     });
     
     // Enter 键发送
@@ -207,26 +222,71 @@ function setupSlider(slider, valueDisplay, onChange = null) {
 }
 
 /**
- * 切换标签页
+ * 切换一级标签组
  */
-function switchTab(tabName) {
-    AppState.currentTab = tabName;
+function switchGroup(groupName) {
+    AppState.currentGroup = groupName;
     
-    Elements.tabBtns.forEach(btn => {
+    // 更新一级标签按钮状态
+    Elements.tabGroupBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.group === groupName);
+    });
+    
+    // 更新标签组显示
+    Elements.tabGroups.forEach(group => {
+        const isActive = group.id === `group${groupName.charAt(0).toUpperCase() + groupName.slice(1)}`;
+        group.classList.toggle('active', isActive);
+    });
+    
+    // 切换后调整图表大小
+    setTimeout(() => {
+        Charts.resizeCharts();
+        setTimeout(() => Charts.resizeCharts(), 200);
+    }, 50);
+}
+
+/**
+ * 切换二级标签
+ */
+function switchSecondaryTab(tabName) {
+    // 找到当前组
+    const groupName = AppState.currentGroup;
+    AppState.currentTabs[groupName] = tabName;
+    
+    // 获取当前组内的二级标签按钮和内容
+    const currentGroup = document.getElementById(`group${groupName.charAt(0).toUpperCase() + groupName.slice(1)}`);
+    if (!currentGroup) return;
+    
+    const secondaryBtns = currentGroup.querySelectorAll('.tab-btn-secondary');
+    const tabContents = currentGroup.querySelectorAll('.tab-content');
+    
+    // 更新二级标签状态
+    secondaryBtns.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tabName);
     });
     
-    Elements.tabContents.forEach(content => {
-        const isActive = content.id === `tab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`;
-        content.classList.toggle('active', isActive);
+    // 更新内容显示
+    tabContents.forEach(content => {
+        // 从 id 提取 tab 名称，如 tabAttentionHeatmap -> attention-heatmap
+        const contentTab = content.id.replace('tab', '').replace(/([A-Z])/g, '-$1').toLowerCase().slice(1);
+        content.classList.toggle('active', contentTab === tabName);
     });
     
-    // 切换后调整图表大小（需要多次延迟确保渲染完成）
+    // 切换后调整图表大小
     setTimeout(() => {
         Charts.resizeCharts();
-        // 再次延迟确保图表完全渲染
         setTimeout(() => Charts.resizeCharts(), 200);
     }, 50);
+}
+
+/**
+ * 切换到指定的组和标签（兼容旧API）
+ */
+function switchTab(groupName, tabName = null) {
+    switchGroup(groupName);
+    if (tabName) {
+        setTimeout(() => switchSecondaryTab(tabName), 100);
+    }
 }
 
 /**
@@ -481,8 +541,8 @@ async function selectToken(index) {
     // 获取并显示概率分布
     await updateProbsChart(index);
     
-    // 切换到概率分布标签页
-    switchTab('probs');
+    // 切换到 Token 分析组的概率分布标签页
+    switchTab('token', 'token-probs');
 }
 
 /**

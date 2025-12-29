@@ -146,38 +146,119 @@
             
             <!-- 右侧面板：可视化 -->
             <aside id="rightPanel" class="right-panel">
-                <div class="viz-tabs">
-                    <button class="tab-btn active" data-tab="attention">注意力热力图</button>
-                    <button class="tab-btn" data-tab="probs">概率分布</button>
-                    <button class="tab-btn" data-tab="entropy">熵分析</button>
-                    <button class="tab-btn" data-tab="confidence">置信度</button>
+                <!-- 一级标签：功能分组 -->
+                <div class="viz-tabs-primary">
+                    <button class="tab-btn-primary active" data-group="attention">注意力分析</button>
+                    <button class="tab-btn-primary" data-group="hidden">隐藏状态</button>
+                    <button class="tab-btn-primary" data-group="token">Token分析</button>
+                    <button class="tab-btn-primary" data-group="attribution">归因分析</button>
                 </div>
                 
-                <div id="tabAttention" class="tab-content active">
-                    <div id="attentionChart" class="chart-container"></div>
-                    <div class="chart-info">
-                        <p>热力图显示生成的每个 token（Y轴）对输入和已生成 token（X轴）的注意力权重</p>
+                <!-- 注意力分析组 -->
+                <div id="groupAttention" class="tab-group active">
+                    <div class="viz-tabs-secondary">
+                        <button class="tab-btn-secondary active" data-tab="attention-heatmap">热力图</button>
+                        <button class="tab-btn-secondary" data-tab="attention-multihead">多头对比</button>
+                        <button class="tab-btn-secondary" data-tab="attention-entropy">注意力头熵</button>
+                    </div>
+                    <div id="tabAttentionHeatmap" class="tab-content active">
+                        <div id="attentionChart" class="chart-container"></div>
+                        <div class="chart-info">
+                            <p>热力图显示生成的每个 token（Y轴）对输入和已生成 token（X轴）的注意力权重</p>
+                        </div>
+                    </div>
+                    <div id="tabAttentionMultihead" class="tab-content">
+                        <div id="multiheadChart" class="chart-container"></div>
+                        <div class="chart-info">
+                            <p>对比不同注意力头的注意力模式，发现专门化的注意力头</p>
+                        </div>
+                    </div>
+                    <div id="tabAttentionEntropy" class="tab-content">
+                        <div id="headEntropyChart" class="chart-container"></div>
+                        <div class="chart-info">
+                            <p>每个注意力头的熵值，低熵表示聚焦型，高熵表示分散型</p>
+                        </div>
                     </div>
                 </div>
                 
-                <div id="tabProbs" class="tab-content">
-                    <div id="probsChart" class="chart-container"></div>
-                    <div class="chart-info">
-                        <p>显示选中 token 位置的 Top-N 候选概率分布</p>
+                <!-- 隐藏状态分析组 -->
+                <div id="groupHidden" class="tab-group">
+                    <div class="viz-tabs-secondary">
+                        <button class="tab-btn-secondary active" data-tab="hidden-similarity">层间相似度</button>
+                        <button class="tab-btn-secondary" data-tab="hidden-residual">残差流</button>
+                        <button class="tab-btn-secondary" data-tab="hidden-logits">Logits Lens</button>
+                    </div>
+                    <div id="tabHiddenSimilarity" class="tab-content active">
+                        <div id="hiddenSimilarityChart" class="chart-container"></div>
+                        <div class="chart-info">
+                            <p>层间隐藏状态的余弦相似度，观察信息如何在层间流动</p>
+                        </div>
+                    </div>
+                    <div id="tabHiddenResidual" class="tab-content">
+                        <div id="residualChart" class="chart-container"></div>
+                        <div class="chart-info">
+                            <p>残差连接前后的向量变化，理解每层的贡献</p>
+                        </div>
+                    </div>
+                    <div id="tabHiddenLogits" class="tab-content">
+                        <div id="logitsLensChart" class="chart-container"></div>
+                        <div class="chart-info">
+                            <p>每一层的logits预测，观察模型何时确定答案</p>
+                        </div>
                     </div>
                 </div>
                 
-                <div id="tabEntropy" class="tab-content">
-                    <div id="entropyChart" class="chart-container"></div>
-                    <div class="chart-info">
-                        <p>熵值越高表示模型在该位置越不确定，分布越均匀</p>
+                <!-- Token分析组 -->
+                <div id="groupToken" class="tab-group">
+                    <div class="viz-tabs-secondary">
+                        <button class="tab-btn-secondary active" data-tab="token-probs">概率分布</button>
+                        <button class="tab-btn-secondary" data-tab="token-embedding">Embedding投影</button>
+                        <button class="tab-btn-secondary" data-tab="token-activation">激活分布</button>
+                    </div>
+                    <div id="tabTokenProbs" class="tab-content active">
+                        <div id="probsChart" class="chart-container"></div>
+                        <div class="chart-info">
+                            <p>显示选中 token 位置的 Top-N 候选概率分布</p>
+                        </div>
+                    </div>
+                    <div id="tabTokenEmbedding" class="tab-content">
+                        <div id="embeddingChart" class="chart-container"></div>
+                        <div class="chart-info">
+                            <p>Token embedding的降维投影，观察语义空间分布</p>
+                        </div>
+                    </div>
+                    <div id="tabTokenActivation" class="tab-content">
+                        <div id="activationChart" class="chart-container"></div>
+                        <div class="chart-info">
+                            <p>MLP和Attention层的激活值分布统计</p>
+                        </div>
                     </div>
                 </div>
                 
-                <div id="tabConfidence" class="tab-content">
-                    <div id="confidenceChart" class="chart-container"></div>
-                    <div class="chart-info">
-                        <p>置信度曲线显示模型对每个生成 token 的确信程度</p>
+                <!-- 归因分析组 -->
+                <div id="groupAttribution" class="tab-group">
+                    <div class="viz-tabs-secondary">
+                        <button class="tab-btn-secondary active" data-tab="attr-entropy">熵曲线</button>
+                        <button class="tab-btn-secondary" data-tab="attr-confidence">置信度</button>
+                        <button class="tab-btn-secondary" data-tab="attr-input">输入归因</button>
+                    </div>
+                    <div id="tabAttrEntropy" class="tab-content active">
+                        <div id="entropyChart" class="chart-container"></div>
+                        <div class="chart-info">
+                            <p>熵值越高表示模型在该位置越不确定，分布越均匀</p>
+                        </div>
+                    </div>
+                    <div id="tabAttrConfidence" class="tab-content">
+                        <div id="confidenceChart" class="chart-container"></div>
+                        <div class="chart-info">
+                            <p>置信度曲线显示模型对每个生成 token 的确信程度</p>
+                        </div>
+                    </div>
+                    <div id="tabAttrInput" class="tab-content">
+                        <div id="attributionChart" class="chart-container"></div>
+                        <div class="chart-info">
+                            <p>每个输入token对输出的影响程度（梯度归因）</p>
+                        </div>
                     </div>
                 </div>
             </aside>
