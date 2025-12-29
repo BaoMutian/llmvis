@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Inference Visualizer</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 顶部标题栏 -->
+        <header class="app-header">
+            <div class="header-title">
+                <span class="logo">◈</span>
+                <h1>LLM Inference Visualizer</h1>
+                <span class="subtitle">探索语言模型的内部机制</span>
+            </div>
+            <div class="header-status">
+                <span id="modelStatus" class="status-badge status-loading">模型加载中...</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- 左侧面板：输入与参数 -->
+            <aside class="left-panel">
+                <section class="panel-section">
+                    <h2 class="section-title">输入</h2>
+                    <textarea 
+                        id="promptInput" 
+                        class="prompt-input" 
+                        placeholder="输入你的问题..."
+                        rows="4"
+                    >解释什么是量子计算。</textarea>
+                    <button id="generateBtn" class="btn btn-primary">
+                        <span class="btn-icon">▶</span>
+                        生成
+                    </button>
+                </section>
+
+                <section class="panel-section">
+                    <h2 class="section-title">推理参数</h2>
+                    <div class="param-group">
+                        <label for="temperature">Temperature</label>
+                        <div class="param-input-row">
+                            <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7">
+                            <span id="temperatureValue" class="param-value">0.7</span>
+                        </div>
+                    </div>
+                    <div class="param-group">
+                        <label for="topK">Top-K</label>
+                        <div class="param-input-row">
+                            <input type="range" id="topK" min="1" max="100" step="1" value="50">
+                            <span id="topKValue" class="param-value">50</span>
+                        </div>
+                    </div>
+                    <div class="param-group">
+                        <label for="topP">Top-P</label>
+                        <div class="param-input-row">
+                            <input type="range" id="topP" min="0" max="1" step="0.05" value="0.9">
+                            <span id="topPValue" class="param-value">0.9</span>
+                        </div>
+                    </div>
+                    <div class="param-group">
+                        <label for="maxTokens">Max Tokens</label>
+                        <div class="param-input-row">
+                            <input type="range" id="maxTokens" min="16" max="512" step="16" value="128">
+                            <span id="maxTokensValue" class="param-value">128</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel-section">
+                    <h2 class="section-title">可视化选项</h2>
+                    <div class="param-group">
+                        <label for="topNProbs">Top-N 概率显示</label>
+                        <div class="param-input-row">
+                            <input type="range" id="topNProbs" min="5" max="30" step="1" value="10">
+                            <span id="topNProbsValue" class="param-value">10</span>
+                        </div>
+                    </div>
+                    <div class="param-group">
+                        <label for="attentionLayer">注意力层</label>
+                        <div class="param-input-row">
+                            <input type="range" id="attentionLayer" min="0" max="35" step="1" value="0">
+                            <span id="attentionLayerValue" class="param-value">0</span>
+                        </div>
+                    </div>
+                    <div class="param-group">
+                        <label for="attentionHead">注意力头</label>
+                        <select id="attentionHead" class="select-input">
+                            <option value="mean">平均 (Mean)</option>
+                            <option value="max">最大 (Max)</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section class="panel-section stats-section">
+                    <h2 class="section-title">统计信息</h2>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">生成 Tokens</span>
+                            <span id="statTokens" class="stat-value">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">平均熵</span>
+                            <span id="statEntropy" class="stat-value">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">困惑度</span>
+                            <span id="statPerplexity" class="stat-value">-</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">平均置信度</span>
+                            <span id="statConfidence" class="stat-value">-</span>
+                        </div>
+                    </div>
+                </section>
+            </aside>
+
+            <!-- 中间面板：Token展示 -->
+            <section class="center-panel">
+                <div class="panel-header">
+                    <h2 class="section-title">生成结果</h2>
+                    <span class="hint-text">点击任意 token 查看概率分布</span>
+                </div>
+                <div id="tokenDisplay" class="token-display">
+                    <div class="placeholder-text">
+                        输入提示并点击"生成"按钮开始推理
+                    </div>
+                </div>
+                <div id="selectedTokenInfo" class="selected-token-info" style="display: none;">
+                    <div class="info-header">
+                        <span class="info-label">选中 Token:</span>
+                        <span id="selectedToken" class="info-value"></span>
+                        <span class="info-label">位置:</span>
+                        <span id="selectedPosition" class="info-value"></span>
+                        <span class="info-label">熵:</span>
+                        <span id="selectedEntropy" class="info-value"></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 右侧面板：可视化 -->
+            <aside class="right-panel">
+                <div class="viz-tabs">
+                    <button class="tab-btn active" data-tab="attention">注意力热力图</button>
+                    <button class="tab-btn" data-tab="probs">概率分布</button>
+                    <button class="tab-btn" data-tab="entropy">熵分析</button>
+                    <button class="tab-btn" data-tab="confidence">置信度</button>
+                </div>
+                
+                <div id="tabAttention" class="tab-content active">
+                    <div id="attentionChart" class="chart-container"></div>
+                    <div class="chart-info">
+                        <p>热力图显示生成的每个 token（Y轴）对输入和已生成 token（X轴）的注意力权重</p>
+                    </div>
+                </div>
+                
+                <div id="tabProbs" class="tab-content">
+                    <div id="probsChart" class="chart-container"></div>
+                    <div class="chart-info">
+                        <p>显示选中 token 位置的 Top-N 候选概率分布</p>
+                    </div>
+                </div>
+                
+                <div id="tabEntropy" class="tab-content">
+                    <div id="entropyChart" class="chart-container"></div>
+                    <div class="chart-info">
+                        <p>熵值越高表示模型在该位置越不确定，分布越均匀</p>
+                    </div>
+                </div>
+                
+                <div id="tabConfidence" class="tab-content">
+                    <div id="confidenceChart" class="chart-container"></div>
+                    <div class="chart-info">
+                        <p>置信度曲线显示模型对每个生成 token 的确信程度</p>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- 加载遮罩 -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">正在推理中...</p>
+    </div>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
+
