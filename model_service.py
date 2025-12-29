@@ -217,6 +217,9 @@ class ModelService:
                 # 保存原始logits（应用温度后）
                 all_logits.append(outputs.logits[:, -1, :].cpu().numpy()[0])
                 
+                # 保存最后一个 token 位置的隐藏状态（用于按需分析）
+                # 只保存引用，实际数据在需要时计算
+                
                 # 保存生成的token
                 token_str = self.tokenizer.decode([next_token_id])
                 generated_tokens.append(token_str)
@@ -349,6 +352,317 @@ class ModelService:
         """计算softmax"""
         exp_x = np.exp(x - np.max(x))
         return exp_x / exp_x.sum()
+    
+    def analyze_logits_lens(
+        self,
+        input_ids: List[int],
+        generated_ids: List[int],
+        step: int,
+        top_k: int = 5
+    ) -> Dict[str, Any]:
+        """
+        执行 Logits Lens 分析：计算每层 hidden states 的 logits 预测
+        
+        Args:
+            input_ids: 输入token ID列表
+            generated_ids: 已生成的token ID列表
+            step: 要分析的生成步骤
+            top_k: 每层返回的 top-k tokens
+            
+        Returns:
+            每层的预测结果
+        """
+        if not self.is_loaded():
+            raise RuntimeError("Model not loaded")
+        
+        # 构建完整序列到指定步骤
+        full_ids = input_ids + generated_ids[:step+1]
+        input_tensor = torch.tensor([full_ids]).to(self.device)
+        
+        with torch.no_grad():
+            outputs = self.model(
+                input_tensor,
+                output_hidden_states=True,
+                return_dict=True
+            )
+            
+            # outputs.hidden_states: (num_layers + 1) x [batch, seq, hidden_size]
+            # 第一个是 embedding 输出，后面是每层的输出
+            hidden_states = outputs.hidden_states
+            
+            # 获取 lm_head 的权重
+            lm_head = self.model.lm_head
+            
+            layer_predictions = []
+            for layer_idx, hs in enumerate(hidden_states[1:]):  # 跳过 embedding
+                # 取最后一个位置的 hidden state
+                last_hs = hs[0, -1, :]  # [hidden_size]
+                
+                # 投影到 vocabulary 空间
+                logits = lm_head(last_hs.unsqueeze(0))[0]  # [vocab_size]
+                probs = torch.softmax(logits, dim=-1)
+                
+                # 获取 top-k
+                top_probs, top_indices = torch.topk(probs, top_k)
+                
+                top_tokens = []
+                for prob, idx in zip(top_probs.tolist(), top_indices.tolist()):
+                    token = self.tokenizer.decode([idx])
+                    top_tokens.append({
+                        "token": token,
+                        "token_id": idx,
+                        "probability": prob
+                    })
+                
+                layer_predictions.append({
+                    "layer": layer_idx,
+                    "top_tokens": top_tokens
+                })
+        
+        actual_token = self.tokenizer.decode([generated_ids[step]]) if step < len(generated_ids) else ""
+        
+        return {
+            "step": step,
+            "actual_token": actual_token,
+            "num_layers": len(layer_predictions),
+            "layer_predictions": layer_predictions
+        }
+    
+    def analyze_hidden_states_similarity(
+        self,
+        input_ids: List[int],
+        generated_ids: List[int],
+        step: int
+    ) -> Dict[str, Any]:
+        """
+        分析层间隐藏状态的相似度
+        
+        Args:
+            input_ids: 输入token ID列表
+            generated_ids: 已生成的token ID列表
+            step: 要分析的生成步骤
+            
+        Returns:
+            层间相似度矩阵
+        """
+        if not self.is_loaded():
+            raise RuntimeError("Model not loaded")
+        
+        full_ids = input_ids + generated_ids[:step+1]
+        input_tensor = torch.tensor([full_ids]).to(self.device)
+        
+        with torch.no_grad():
+            outputs = self.model(
+                input_tensor,
+                output_hidden_states=True,
+                return_dict=True
+            )
+            
+            hidden_states = outputs.hidden_states[1:]  # 跳过 embedding
+            num_layers = len(hidden_states)
+            
+            # 取每层最后一个位置的 hidden state
+            last_hidden = [hs[0, -1, :] for hs in hidden_states]
+            
+            # 计算层间余弦相似度
+            similarity_matrix = []
+            for i in range(num_layers):
+                row = []
+                for j in range(num_layers):
+                    cos_sim = torch.nn.functional.cosine_similarity(
+                        last_hidden[i].unsqueeze(0),
+                        last_hidden[j].unsqueeze(0)
+                    ).item()
+                    row.append(cos_sim)
+                similarity_matrix.append(row)
+        
+        return {
+            "step": step,
+            "num_layers": num_layers,
+            "similarity_matrix": similarity_matrix
+        }
+    
+    def analyze_residual_stream(
+        self,
+        input_ids: List[int],
+        generated_ids: List[int],
+        step: int
+    ) -> Dict[str, Any]:
+        """
+        分析残差流：每层的范数和贡献
+        
+        Args:
+            input_ids: 输入token ID列表
+            generated_ids: 已生成的token ID列表
+            step: 要分析的生成步骤
+            
+        Returns:
+            残差流分析结果
+        """
+        if not self.is_loaded():
+            raise RuntimeError("Model not loaded")
+        
+        full_ids = input_ids + generated_ids[:step+1]
+        input_tensor = torch.tensor([full_ids]).to(self.device)
+        
+        with torch.no_grad():
+            outputs = self.model(
+                input_tensor,
+                output_hidden_states=True,
+                return_dict=True
+            )
+            
+            hidden_states = outputs.hidden_states  # 包括 embedding
+            num_layers = len(hidden_states) - 1
+            
+            # 取每层最后一个位置
+            last_hidden = [hs[0, -1, :] for hs in hidden_states]
+            
+            # 计算范数
+            layer_norms = [torch.norm(h).item() for h in last_hidden[1:]]
+            
+            # 计算残差贡献（相邻层的差异）
+            residual_contributions = []
+            for i in range(1, len(last_hidden)):
+                diff = last_hidden[i] - last_hidden[i-1]
+                contribution = torch.norm(diff).item()
+                residual_contributions.append(contribution)
+        
+        return {
+            "step": step,
+            "num_layers": num_layers,
+            "layer_norms": layer_norms,
+            "residual_contributions": residual_contributions
+        }
+    
+    def analyze_embeddings(
+        self,
+        input_ids: List[int],
+        generated_ids: List[int]
+    ) -> Dict[str, Any]:
+        """
+        获取并降维 token embeddings
+        
+        Args:
+            input_ids: 输入token ID列表
+            generated_ids: 生成的token ID列表
+            
+        Returns:
+            降维后的 embeddings
+        """
+        if not self.is_loaded():
+            raise RuntimeError("Model not loaded")
+        
+        from sklearn.decomposition import PCA
+        
+        all_ids = input_ids + generated_ids
+        
+        with torch.no_grad():
+            # 获取 embedding 层
+            embed_tokens = self.model.model.embed_tokens
+            embeddings = embed_tokens(torch.tensor([all_ids]).to(self.device))[0]  # [seq, hidden]
+            embeddings_np = embeddings.cpu().numpy()
+            
+            # PCA 降维到 2D
+            if embeddings_np.shape[0] > 2:
+                pca = PCA(n_components=2)
+                reduced = pca.fit_transform(embeddings_np)
+            else:
+                reduced = embeddings_np[:, :2]
+        
+        tokens = [self.tokenizer.decode([tid]) for tid in all_ids]
+        token_types = ['input'] * len(input_ids) + ['output'] * len(generated_ids)
+        
+        return {
+            "embeddings": reduced.tolist(),
+            "tokens": tokens,
+            "token_types": token_types
+        }
+    
+    def analyze_activations(
+        self,
+        input_ids: List[int],
+        generated_ids: List[int],
+        layer_idx: int,
+        step: int
+    ) -> Dict[str, Any]:
+        """
+        分析指定层的激活值分布
+        
+        Args:
+            input_ids: 输入token ID列表
+            generated_ids: 生成的token ID列表
+            layer_idx: 层索引
+            step: 生成步骤
+            
+        Returns:
+            激活值统计和直方图数据
+        """
+        if not self.is_loaded():
+            raise RuntimeError("Model not loaded")
+        
+        full_ids = input_ids + generated_ids[:step+1]
+        input_tensor = torch.tensor([full_ids]).to(self.device)
+        
+        activations_data = {}
+        
+        def hook_fn(name):
+            def fn(module, input, output):
+                if isinstance(output, tuple):
+                    output = output[0]
+                activations_data[name] = output.detach().cpu().numpy()
+            return fn
+        
+        # 注册 hook
+        layer = self.model.model.layers[layer_idx]
+        hooks = []
+        hooks.append(layer.mlp.register_forward_hook(hook_fn('mlp')))
+        hooks.append(layer.self_attn.register_forward_hook(hook_fn('attn')))
+        
+        with torch.no_grad():
+            self.model(input_tensor, output_hidden_states=True)
+        
+        # 移除 hooks
+        for hook in hooks:
+            hook.remove()
+        
+        # 计算统计
+        mlp_acts = activations_data.get('mlp', np.array([]))
+        attn_acts = activations_data.get('attn', np.array([]))
+        
+        def compute_stats(arr):
+            if arr.size == 0:
+                return {"mean": 0, "std": 0, "min": 0, "max": 0}
+            flat = arr.flatten()
+            return {
+                "mean": float(np.mean(flat)),
+                "std": float(np.std(flat)),
+                "min": float(np.min(flat)),
+                "max": float(np.max(flat))
+            }
+        
+        def compute_histogram(arr, bins=20):
+            if arr.size == 0:
+                return [], []
+            flat = arr.flatten()
+            counts, bin_edges = np.histogram(flat, bins=bins)
+            bin_labels = [f"{bin_edges[i]:.2f}" for i in range(len(bin_edges)-1)]
+            return counts.tolist(), bin_labels
+        
+        mlp_counts, mlp_bins = compute_histogram(mlp_acts)
+        attn_counts, attn_bins = compute_histogram(attn_acts)
+        
+        return {
+            "layer": layer_idx,
+            "step": step,
+            "mlp_stats": compute_stats(mlp_acts),
+            "attention_stats": compute_stats(attn_acts),
+            "histogram": {
+                "bins": mlp_bins or attn_bins,
+                "mlp_counts": mlp_counts,
+                "attn_counts": attn_counts
+            }
+        }
 
 
 # 全局模型服务实例

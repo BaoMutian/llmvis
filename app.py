@@ -439,6 +439,267 @@ def get_layer_similarity():
         }), 500
 
 
+@app.route("/api/analyze/logits_lens", methods=["GET"])
+def get_logits_lens():
+    """获取 Logits Lens 分析：每层的 logits 预测"""
+    global latest_result
+
+    if latest_result is None:
+        return jsonify({
+            "success": False,
+            "message": "No generation result available. Please generate first."
+        }), 400
+
+    step = int(request.args.get("step", 0))
+    top_k = int(request.args.get("top_k", 5))
+
+    num_generated = len(latest_result["generated_tokens"])
+    if step < 0 or step >= num_generated:
+        return jsonify({
+            "success": False,
+            "message": f"Invalid step. Must be between 0 and {num_generated - 1}"
+        }), 400
+
+    try:
+        # 获取输入 token IDs
+        input_ids = [model_service.tokenizer.encode(t, add_special_tokens=False)[0] 
+                     if model_service.tokenizer.encode(t, add_special_tokens=False) 
+                     else 0 for t in latest_result["input_tokens"]]
+        # 简化：直接使用 tokenizer 重新编码
+        prompt = latest_result["prompt"]
+        messages = [{"role": "user", "content": prompt}]
+        text = model_service.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        input_ids = model_service.tokenizer.encode(text, add_special_tokens=False)
+        
+        generated_ids = latest_result["generated_token_ids"]
+
+        result = model_service.analyze_logits_lens(input_ids, generated_ids, step, top_k)
+
+        return jsonify({
+            "success": True,
+            **result
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/analyze/hidden_states", methods=["GET"])
+def get_hidden_states_similarity():
+    """获取 Hidden States 层间相似度"""
+    global latest_result
+
+    if latest_result is None:
+        return jsonify({
+            "success": False,
+            "message": "No generation result available. Please generate first."
+        }), 400
+
+    step = int(request.args.get("step", 0))
+
+    num_generated = len(latest_result["generated_tokens"])
+    if step < 0 or step >= num_generated:
+        return jsonify({
+            "success": False,
+            "message": f"Invalid step. Must be between 0 and {num_generated - 1}"
+        }), 400
+
+    try:
+        prompt = latest_result["prompt"]
+        messages = [{"role": "user", "content": prompt}]
+        text = model_service.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        input_ids = model_service.tokenizer.encode(text, add_special_tokens=False)
+        generated_ids = latest_result["generated_token_ids"]
+
+        result = model_service.analyze_hidden_states_similarity(input_ids, generated_ids, step)
+
+        return jsonify({
+            "success": True,
+            **result
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/analyze/residual", methods=["GET"])
+def get_residual_analysis():
+    """获取残差流分析"""
+    global latest_result
+
+    if latest_result is None:
+        return jsonify({
+            "success": False,
+            "message": "No generation result available. Please generate first."
+        }), 400
+
+    step = int(request.args.get("step", 0))
+
+    num_generated = len(latest_result["generated_tokens"])
+    if step < 0 or step >= num_generated:
+        return jsonify({
+            "success": False,
+            "message": f"Invalid step. Must be between 0 and {num_generated - 1}"
+        }), 400
+
+    try:
+        prompt = latest_result["prompt"]
+        messages = [{"role": "user", "content": prompt}]
+        text = model_service.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        input_ids = model_service.tokenizer.encode(text, add_special_tokens=False)
+        generated_ids = latest_result["generated_token_ids"]
+
+        result = model_service.analyze_residual_stream(input_ids, generated_ids, step)
+
+        return jsonify({
+            "success": True,
+            **result
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/analyze/embeddings", methods=["GET"])
+def get_embeddings():
+    """获取 Token Embedding 投影"""
+    global latest_result
+
+    if latest_result is None:
+        return jsonify({
+            "success": False,
+            "message": "No generation result available. Please generate first."
+        }), 400
+
+    try:
+        prompt = latest_result["prompt"]
+        messages = [{"role": "user", "content": prompt}]
+        text = model_service.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        input_ids = model_service.tokenizer.encode(text, add_special_tokens=False)
+        generated_ids = latest_result["generated_token_ids"]
+
+        result = model_service.analyze_embeddings(input_ids, generated_ids)
+
+        return jsonify({
+            "success": True,
+            **result
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/analyze/activations", methods=["GET"])
+def get_activations():
+    """获取激活值分布"""
+    global latest_result
+
+    if latest_result is None:
+        return jsonify({
+            "success": False,
+            "message": "No generation result available. Please generate first."
+        }), 400
+
+    layer = int(request.args.get("layer", 0))
+    step = int(request.args.get("step", 0))
+
+    num_generated = len(latest_result["generated_tokens"])
+    num_layers = latest_result["num_layers"]
+    
+    if layer < 0 or layer >= num_layers:
+        return jsonify({"success": False, "message": f"Invalid layer. Must be 0-{num_layers-1}"}), 400
+    if step < 0 or step >= num_generated:
+        return jsonify({"success": False, "message": f"Invalid step. Must be 0-{num_generated-1}"}), 400
+
+    try:
+        prompt = latest_result["prompt"]
+        messages = [{"role": "user", "content": prompt}]
+        text = model_service.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        input_ids = model_service.tokenizer.encode(text, add_special_tokens=False)
+        generated_ids = latest_result["generated_token_ids"]
+
+        result = model_service.analyze_activations(input_ids, generated_ids, layer, step)
+
+        return jsonify({
+            "success": True,
+            **result
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/analyze/attribution", methods=["GET"])
+def get_input_attribution():
+    """获取输入归因分析"""
+    global latest_result
+
+    if latest_result is None:
+        return jsonify({
+            "success": False,
+            "message": "No generation result available. Please generate first."
+        }), 400
+
+    output_idx = int(request.args.get("output_idx", 0))
+
+    num_generated = len(latest_result["generated_tokens"])
+    if output_idx < 0 or output_idx >= num_generated:
+        return jsonify({
+            "success": False,
+            "message": f"Invalid output_idx. Must be between 0 and {num_generated - 1}"
+        }), 400
+
+    try:
+        prompt = latest_result["prompt"]
+        messages = [{"role": "user", "content": prompt}]
+        text = model_service.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        input_ids = model_service.tokenizer.encode(text, add_special_tokens=False)
+        generated_ids = latest_result["generated_token_ids"]
+        
+        # 简化的归因：使用注意力权重作为近似
+        # 获取最后一层的注意力，作为归因的近似
+        attentions = latest_result["attentions"]
+        step_attn = attentions[output_idx]
+        # 最后一层，平均所有头
+        last_layer_attn = step_attn[-1]  # [heads, seq_len]
+        avg_attn = np.mean(last_layer_attn, axis=0)  # [seq_len]
+        
+        # 只取输入部分
+        input_length = len(input_ids)
+        input_attributions = avg_attn[:input_length].tolist()
+        
+        # 归一化
+        max_attr = max(input_attributions) if input_attributions else 1.0
+        if max_attr > 0:
+            input_attributions = [a / max_attr for a in input_attributions]
+        
+        input_tokens = latest_result["input_tokens"]
+        output_token = latest_result["generated_tokens"][output_idx]
+
+        return jsonify({
+            "success": True,
+            "output_idx": output_idx,
+            "output_token": output_token,
+            "input_tokens": input_tokens,
+            "attributions": input_attributions
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("LLM Inference Visualization Server")

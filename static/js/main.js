@@ -538,8 +538,9 @@ async function selectToken(index) {
     Elements.selectedPosition.textContent = index;
     Elements.selectedEntropy.textContent = entropy.toFixed(4);
     
-    // 获取并显示概率分布
+    // 获取并显示概率分布和归因
     await updateProbsChart(index);
+    await updateAttributionChart();
     
     // 切换到 Token 分析组的概率分布标签页
     switchTab('token', 'token-probs');
@@ -566,9 +567,19 @@ async function updateAllCharts() {
     await updateMultiheadChart();
     await updateHeadEntropyChart();
     
+    // 隐藏状态分析组
+    await updateHiddenSimilarityChart();
+    await updateResidualChart();
+    await updateLogitsLensChart();
+    
+    // Token 分析组
+    await updateEmbeddingChart();
+    await updateActivationChart();
+    
     // 归因分析组
     updateEntropyChart();
     updateConfidenceChart();
+    await updateAttributionChart();
     
     // 如果有选中的token，更新概率分布
     if (AppState.selectedTokenIndex !== null) {
@@ -702,6 +713,128 @@ function updateConfidenceChart() {
         confidence_curve: analysis.confidence_curve,
         generated_tokens: generated_tokens
     });
+}
+
+/**
+ * 更新 Logits Lens 图
+ */
+async function updateLogitsLensChart() {
+    if (!AppState.generationResult) return;
+    
+    try {
+        // 默认分析最后一个生成的 token
+        const numSteps = AppState.generationResult.generated_tokens.length;
+        const step = numSteps > 0 ? numSteps - 1 : 0;
+        
+        const data = await API.getLogitsLens(step);
+        
+        if (data.success) {
+            Charts.renderLogitsLensChart(data);
+        }
+    } catch (error) {
+        console.error('Logits lens chart error:', error);
+    }
+}
+
+/**
+ * 更新 Hidden States 相似度图
+ */
+async function updateHiddenSimilarityChart() {
+    if (!AppState.generationResult) return;
+    
+    try {
+        const numSteps = AppState.generationResult.generated_tokens.length;
+        const step = numSteps > 0 ? numSteps - 1 : 0;
+        
+        const data = await API.getHiddenStatesSimilarity(step);
+        
+        if (data.success) {
+            Charts.renderHiddenSimilarityChart(data);
+        }
+    } catch (error) {
+        console.error('Hidden similarity chart error:', error);
+    }
+}
+
+/**
+ * 更新残差流分析图
+ */
+async function updateResidualChart() {
+    if (!AppState.generationResult) return;
+    
+    try {
+        const numSteps = AppState.generationResult.generated_tokens.length;
+        const step = numSteps > 0 ? numSteps - 1 : 0;
+        
+        const data = await API.getResidualAnalysis(step);
+        
+        if (data.success) {
+            Charts.renderResidualChart(data);
+        }
+    } catch (error) {
+        console.error('Residual chart error:', error);
+    }
+}
+
+/**
+ * 更新 Embedding 投影图
+ */
+async function updateEmbeddingChart() {
+    if (!AppState.generationResult) return;
+    
+    try {
+        const data = await API.getEmbeddingProjection();
+        
+        if (data.success) {
+            Charts.renderEmbeddingChart(data);
+        }
+    } catch (error) {
+        console.error('Embedding chart error:', error);
+    }
+}
+
+/**
+ * 更新激活值分布图
+ */
+async function updateActivationChart() {
+    if (!AppState.generationResult) return;
+    
+    try {
+        const layer = parseInt(Elements.attentionLayer.value);
+        const numSteps = AppState.generationResult.generated_tokens.length;
+        const step = numSteps > 0 ? numSteps - 1 : 0;
+        
+        const data = await API.getActivationStats(layer);
+        
+        if (data.success) {
+            Charts.renderActivationChart(data);
+        }
+    } catch (error) {
+        console.error('Activation chart error:', error);
+    }
+}
+
+/**
+ * 更新输入归因图
+ */
+async function updateAttributionChart() {
+    if (!AppState.generationResult) return;
+    
+    try {
+        // 如果有选中的 token，分析该 token 的归因
+        // 否则分析最后一个 token
+        const outputIdx = AppState.selectedTokenIndex !== null 
+            ? AppState.selectedTokenIndex 
+            : AppState.generationResult.generated_tokens.length - 1;
+        
+        const data = await API.getInputAttribution(outputIdx);
+        
+        if (data.success) {
+            Charts.renderAttributionChart(data);
+        }
+    } catch (error) {
+        console.error('Attribution chart error:', error);
+    }
 }
 
 /**
