@@ -587,53 +587,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     font-family: var(--font-mono);
 }
 
-/* Token 颜色 - 熵视图 */
-.generated-token.entropy-low {
-    background: rgba(0, 212, 170, 0.2);
-    border-color: rgba(0, 212, 170, 0.5);
-}
-
-.generated-token.entropy-mid {
-    background: rgba(245, 158, 11, 0.2);
-    border-color: rgba(245, 158, 11, 0.5);
-}
-
-.generated-token.entropy-high {
-    background: rgba(239, 68, 68, 0.2);
-    border-color: rgba(239, 68, 68, 0.5);
-}
-
-/* Token 颜色 - 概率视图 */
-.generated-token.prob-high {
-    background: rgba(0, 212, 170, 0.3);
-    border-color: rgba(0, 212, 170, 0.6);
-}
-
-.generated-token.prob-mid {
-    background: rgba(168, 85, 247, 0.2);
-    border-color: rgba(168, 85, 247, 0.5);
-}
-
-.generated-token.prob-low {
-    background: rgba(239, 68, 68, 0.2);
-    border-color: rgba(239, 68, 68, 0.5);
-}
-
-/* Token 颜色 - Logit 视图 */
-.generated-token.logit-high {
-    background: rgba(0, 212, 170, 0.3);
-    border-color: rgba(0, 212, 170, 0.6);
-}
-
-.generated-token.logit-mid {
-    background: rgba(168, 85, 247, 0.2);
-    border-color: rgba(168, 85, 247, 0.5);
-}
-
-.generated-token.logit-low {
-    background: rgba(90, 100, 112, 0.3);
-    border-color: rgba(90, 100, 112, 0.5);
-}
+/* Token 颜色模式样式在 .token.generated-token 之后定义，见下方 */
 
 .token-display {
     flex: 1;
@@ -695,6 +649,54 @@ input[type="range"]::-webkit-slider-thumb:hover {
     background: rgba(0, 212, 170, 0.2);
     border-color: var(--color-primary);
     box-shadow: 0 2px 8px var(--color-primary-glow);
+}
+
+/* Token 颜色 - 熵视图 (必须在 .token.generated-token 之后) */
+.token.generated-token.entropy-low {
+    background: rgba(0, 212, 170, 0.25) !important;
+    border-color: rgba(0, 212, 170, 0.6) !important;
+}
+
+.token.generated-token.entropy-mid {
+    background: rgba(245, 158, 11, 0.25) !important;
+    border-color: rgba(245, 158, 11, 0.6) !important;
+}
+
+.token.generated-token.entropy-high {
+    background: rgba(239, 68, 68, 0.25) !important;
+    border-color: rgba(239, 68, 68, 0.6) !important;
+}
+
+/* Token 颜色 - 概率视图 */
+.token.generated-token.prob-high {
+    background: rgba(0, 212, 170, 0.35) !important;
+    border-color: rgba(0, 212, 170, 0.7) !important;
+}
+
+.token.generated-token.prob-mid {
+    background: rgba(168, 85, 247, 0.25) !important;
+    border-color: rgba(168, 85, 247, 0.6) !important;
+}
+
+.token.generated-token.prob-low {
+    background: rgba(239, 68, 68, 0.25) !important;
+    border-color: rgba(239, 68, 68, 0.6) !important;
+}
+
+/* Token 颜色 - Logit 视图 */
+.token.generated-token.logit-high {
+    background: rgba(0, 212, 170, 0.35) !important;
+    border-color: rgba(0, 212, 170, 0.7) !important;
+}
+
+.token.generated-token.logit-mid {
+    background: rgba(168, 85, 247, 0.25) !important;
+    border-color: rgba(168, 85, 247, 0.6) !important;
+}
+
+.token.generated-token.logit-low {
+    background: rgba(90, 100, 112, 0.35) !important;
+    border-color: rgba(90, 100, 112, 0.6) !important;
 }
 
 .token.selected {

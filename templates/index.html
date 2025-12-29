@@ -220,7 +220,10 @@
 					>
 						<div class="info-header">
 							<span class="info-label">选中:</span>
-							<span id="selectedToken" class="info-value token-highlight"></span>
+							<span
+								id="selectedToken"
+								class="info-value token-highlight"
+							></span>
 							<span class="info-label">位置:</span>
 							<span id="selectedPosition" class="info-value"></span>
 							<span class="info-label">熵:</span>
@@ -388,8 +391,18 @@
 									<option value="desc">高→低</option>
 									<option value="asc">低→高</option>
 								</select>
-								<label class="toolbar-label" style="margin-left: 12px;">高熵阈值:</label>
-								<input type="number" id="entropyPercentile" class="number-input-sm" value="75" min="0" max="100" step="5" />
+								<label class="toolbar-label" style="margin-left: 12px"
+									>高熵阈值:</label
+								>
+								<input
+									type="number"
+									id="entropyPercentile"
+									class="number-input-sm"
+									value="75"
+									min="0"
+									max="100"
+									step="5"
+								/>
 								<span class="toolbar-label">%</span>
 							</div>
 							<div id="entropyChart" class="chart-container"></div>
