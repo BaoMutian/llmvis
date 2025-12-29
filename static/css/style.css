@@ -489,6 +489,39 @@ input[type="range"]::-webkit-slider-thumb:hover {
     border-color: var(--color-primary);
 }
 
+.select-input-sm {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-main);
+    font-size: 10px;
+    cursor: pointer;
+}
+
+.select-input-sm:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.number-input-sm {
+    width: 50px;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-align: center;
+}
+
+.number-input-sm:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
 /* Stats Section */
 .stats-grid {
     display: grid;
@@ -538,6 +571,68 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .hint-text {
     font-size: 11px;
     color: var(--text-dim);
+}
+
+.token-color-mode {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.token-highlight {
+    padding: 2px 6px;
+    background: var(--color-primary);
+    color: var(--bg-base);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+}
+
+/* Token 颜色 - 熵视图 */
+.generated-token.entropy-low {
+    background: rgba(0, 212, 170, 0.2);
+    border-color: rgba(0, 212, 170, 0.5);
+}
+
+.generated-token.entropy-mid {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.5);
+}
+
+.generated-token.entropy-high {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* Token 颜色 - 概率视图 */
+.generated-token.prob-high {
+    background: rgba(0, 212, 170, 0.3);
+    border-color: rgba(0, 212, 170, 0.6);
+}
+
+.generated-token.prob-mid {
+    background: rgba(168, 85, 247, 0.2);
+    border-color: rgba(168, 85, 247, 0.5);
+}
+
+.generated-token.prob-low {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* Token 颜色 - Logit 视图 */
+.generated-token.logit-high {
+    background: rgba(0, 212, 170, 0.3);
+    border-color: rgba(0, 212, 170, 0.6);
+}
+
+.generated-token.logit-mid {
+    background: rgba(168, 85, 247, 0.2);
+    border-color: rgba(168, 85, 247, 0.5);
+}
+
+.generated-token.logit-low {
+    background: rgba(90, 100, 112, 0.3);
+    border-color: rgba(90, 100, 112, 0.5);
 }
 
 .token-display {

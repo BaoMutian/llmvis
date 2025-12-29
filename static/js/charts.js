@@ -337,28 +337,69 @@ function renderProbsChart(data) {
 }
 
 /**
- * 渲染熵分布折线图
+ * 渲染熵分布图（支持排序和百分位数高亮）
  * @param {Object} data - 熵数据
  */
 function renderEntropyChart(data) {
     const chart = chartInstances.entropy;
     if (!chart) return;
     
-    const { entropies_bits, generated_tokens, mean_entropy, std_entropy } = data;
+    const { entropies_bits, generated_tokens, mean_entropy, sortMode = 'position', percentile = 75 } = data;
     
     if (!entropies_bits || entropies_bits.length === 0) {
         chart.clear();
         return;
     }
     
-    const xData = generated_tokens || entropies_bits.map((_, i) => i);
     const meanValue = mean_entropy || entropies_bits.reduce((a, b) => a + b, 0) / entropies_bits.length;
+    
+    // 创建索引数据对，包含原始位置
+    let indexedData = entropies_bits.map((entropy, idx) => ({
+        entropy,
+        token: generated_tokens ? generated_tokens[idx] : idx,
+        originalIndex: idx
+    }));
+    
+    // 根据排序模式排序
+    let xAxisName = 'Token 位置';
+    let titleSuffix = '';
+    if (sortMode === 'desc') {
+        indexedData.sort((a, b) => b.entropy - a.entropy);
+        xAxisName = 'Token (高熵→低熵)';
+        titleSuffix = ' [高→低]';
+    } else if (sortMode === 'asc') {
+        indexedData.sort((a, b) => a.entropy - b.entropy);
+        xAxisName = 'Token (低熵→高熵)';
+        titleSuffix = ' [低→高]';
+    }
+    
+    // 计算百分位数阈值
+    const sortedEntropies = [...entropies_bits].sort((a, b) => a - b);
+    const percentileIdx = Math.floor((percentile / 100) * sortedEntropies.length);
+    const thresholdValue = sortedEntropies[Math.min(percentileIdx, sortedEntropies.length - 1)];
+    
+    // 根据阈值着色
+    const chartData = indexedData.map(item => ({
+        value: item.entropy,
+        itemStyle: {
+            color: item.entropy >= thresholdValue ? CHART_COLORS.danger : CHART_COLORS.primary
+        },
+        originalIndex: item.originalIndex,
+        token: item.token
+    }));
+    
+    const xLabels = indexedData.map(item => {
+        const label = typeof item.token === 'string' ? item.token.substring(0, 4) : item.originalIndex;
+        return sortMode === 'position' ? item.originalIndex : label;
+    });
+    
+    const isLinear = sortMode === 'position';
     
     const option = {
         backgroundColor: 'transparent',
         title: {
-            text: '熵分布曲线',
-            subtext: `平均熵: ${meanValue.toFixed(3)} nats`,
+            text: '熵分布' + titleSuffix,
+            subtext: `平均: ${meanValue.toFixed(3)} bits | 高熵阈值(${percentile}%): ${thresholdValue.toFixed(3)}`,
             left: 'center',
             textStyle: {
                 color: CHART_COLORS.textPrimary,
@@ -374,12 +415,15 @@ function renderEntropyChart(data) {
             trigger: 'axis',
             formatter: function(params) {
                 const item = params[0];
-                const token = generated_tokens ? generated_tokens[item.dataIndex] : item.dataIndex;
+                if (!item || item.value === undefined) return '';
+                const dataItem = chartData[item.dataIndex];
+                const isHigh = item.value >= thresholdValue;
                 return `
                     <div style="font-family: monospace;">
-                        <div>位置: ${item.dataIndex}</div>
-                        <div>Token: <b style="color:${CHART_COLORS.primary}">${token}</b></div>
+                        <div>位置: ${dataItem.originalIndex}</div>
+                        <div>Token: <b style="color:${CHART_COLORS.primary}">${dataItem.token}</b></div>
                         <div>熵: <b>${item.value.toFixed(3)} bits</b></div>
+                        <div>${isHigh ? '<span style="color:#ef4444">⚠ 高熵</span>' : '<span style="color:#00d4aa">✓ 正常</span>'}</div>
                     </div>
                 `;
             },
@@ -390,22 +434,24 @@ function renderEntropyChart(data) {
         grid: {
             left: 60,
             right: 20,
-            top: 70,
-            bottom: 50
+            top: 80,
+            bottom: isLinear ? 50 : 70
         },
         xAxis: {
             type: 'category',
-            data: xData.map((_, i) => i),
-            name: 'Token 位置',
+            data: xLabels,
+            name: xAxisName,
             nameLocation: 'middle',
-            nameGap: 30,
+            nameGap: isLinear ? 30 : 50,
             nameTextStyle: {
                 color: CHART_COLORS.textSecondary,
                 fontSize: 11
             },
             axisLabel: {
                 color: CHART_COLORS.textSecondary,
-                fontSize: 10
+                fontSize: isLinear ? 10 : 8,
+                rotate: isLinear ? 0 : 45,
+                interval: isLinear ? 'auto' : Math.max(0, Math.floor(xLabels.length / 15) - 1)
             },
             axisLine: {
                 lineStyle: { color: CHART_COLORS.border }
@@ -432,19 +478,16 @@ function renderEntropyChart(data) {
         series: [
             {
                 name: '熵',
-                type: 'line',
-                data: entropies_bits,
-                smooth: true,
-                symbol: 'circle',
+                type: isLinear ? 'line' : 'bar',
+                data: chartData,
+                smooth: isLinear,
+                symbol: isLinear ? 'circle' : 'none',
                 symbolSize: 6,
-                lineStyle: {
+                lineStyle: isLinear ? {
                     color: CHART_COLORS.primary,
                     width: 2
-                },
-                itemStyle: {
-                    color: CHART_COLORS.primary
-                },
-                areaStyle: {
+                } : undefined,
+                areaStyle: isLinear ? {
                     color: {
                         type: 'linear',
                         x: 0, y: 0, x2: 0, y2: 1,
@@ -453,18 +496,20 @@ function renderEntropyChart(data) {
                             { offset: 1, color: 'rgba(0, 212, 170, 0.02)' }
                         ]
                     }
-                }
+                } : undefined,
+                barWidth: '60%'
             },
             {
-                name: '平均熵',
+                name: '高熵阈值',
                 type: 'line',
-                data: entropies_bits.map(() => meanValue),
+                data: chartData.map(() => thresholdValue),
                 lineStyle: {
-                    color: CHART_COLORS.warning,
+                    color: CHART_COLORS.danger,
                     type: 'dashed',
-                    width: 1
+                    width: 1.5
                 },
-                symbol: 'none'
+                symbol: 'none',
+                z: 10
             }
         ]
     };

@@ -16,7 +16,10 @@ const AppState = {
     },
     numLayers: 36,
     numHeads: 32,
-    embeddingDims: 2  // Embedding 投影维度 (2 或 3)
+    embeddingDims: 2,  // Embedding 投影维度 (2 或 3)
+    tokenColorMode: 'entropy',  // Token 颜色模式: none, entropy, probability, logit
+    entropySortMode: 'position',  // 熵排序模式: position, desc, asc
+    entropyPercentile: 75  // 高熵阈值百分位数
 };
 
 // DOM 元素引用
@@ -79,7 +82,18 @@ const Elements = {
     
     // Embedding 维度切换
     embedding2D: null,
-    embedding3D: null
+    embedding3D: null,
+    
+    // Token 颜色模式
+    tokenColorMode: null,
+    
+    // 选中 Token 详情
+    selectedProb: null,
+    selectedLogit: null,
+    
+    // 熵曲线控制
+    entropySortMode: null,
+    entropyPercentile: null
 };
 
 /**
@@ -135,6 +149,12 @@ function initElements() {
     
     Elements.embedding2D = document.getElementById('embedding2D');
     Elements.embedding3D = document.getElementById('embedding3D');
+    
+    Elements.tokenColorMode = document.getElementById('tokenColorMode');
+    Elements.selectedProb = document.getElementById('selectedProb');
+    Elements.selectedLogit = document.getElementById('selectedLogit');
+    Elements.entropySortMode = document.getElementById('entropySortMode');
+    Elements.entropyPercentile = document.getElementById('entropyPercentile');
 }
 
 /**
@@ -182,6 +202,19 @@ function setupEventListeners() {
     }
     if (Elements.embedding3D) {
         Elements.embedding3D.addEventListener('click', () => switchEmbeddingDims(3));
+    }
+    
+    // Token 颜色模式切换
+    if (Elements.tokenColorMode) {
+        Elements.tokenColorMode.addEventListener('change', handleTokenColorModeChange);
+    }
+    
+    // 熵曲线控制
+    if (Elements.entropySortMode) {
+        Elements.entropySortMode.addEventListener('change', handleEntropySortChange);
+    }
+    if (Elements.entropyPercentile) {
+        Elements.entropyPercentile.addEventListener('change', handleEntropyPercentileChange);
     }
     
     // 右侧面板拖动调整宽度
@@ -506,11 +539,54 @@ async function handleGenerate() {
 }
 
 /**
+ * 获取 Token 的颜色类
+ */
+function getTokenColorClass(idx, result) {
+    const mode = AppState.tokenColorMode;
+    const { analysis } = result;
+    
+    if (mode === 'none') return '';
+    
+    if (mode === 'entropy') {
+        const { entropies, max_entropy, min_entropy } = analysis;
+        const entropy = entropies[idx];
+        const normalizedEntropy = (entropy - min_entropy) / (max_entropy - min_entropy + 0.001);
+        
+        if (normalizedEntropy > 0.7) return 'entropy-high';
+        if (normalizedEntropy < 0.3) return 'entropy-low';
+        return 'entropy-mid';
+    }
+    
+    if (mode === 'probability') {
+        const confidence = analysis.confidence_curve[idx];
+        if (confidence) {
+            const prob = confidence.max_prob;
+            if (prob > 0.7) return 'prob-high';
+            if (prob < 0.3) return 'prob-low';
+            return 'prob-mid';
+        }
+    }
+    
+    if (mode === 'logit') {
+        const confidence = analysis.confidence_curve[idx];
+        if (confidence) {
+            // 使用概率差距作为 logit 的代理指标
+            const gap = confidence.prob_gap;
+            if (gap > 0.5) return 'logit-high';
+            if (gap < 0.1) return 'logit-low';
+            return 'logit-mid';
+        }
+    }
+    
+    return '';
+}
+
+/**
  * 渲染 Token 展示
  */
 function renderTokens(result) {
     const { input_tokens, generated_tokens, analysis } = result;
-    const { entropies, max_entropy, min_entropy } = analysis;
+    const { entropies } = analysis;
     
     let html = '';
     
@@ -534,22 +610,17 @@ function renderTokens(result) {
     html += '<div class="generated-tokens-section">';
     generated_tokens.forEach((token, idx) => {
         const entropy = entropies[idx];
-        const normalizedEntropy = (entropy - min_entropy) / (max_entropy - min_entropy + 0.001);
-        
-        // 根据熵值设置颜色类
-        let entropyClass = '';
-        if (normalizedEntropy > 0.7) {
-            entropyClass = 'high-entropy';
-        } else if (normalizedEntropy < 0.3) {
-            entropyClass = 'low-entropy';
-        }
+        const confidence = analysis.confidence_curve[idx];
+        const colorClass = getTokenColorClass(idx, result);
         
         const displayToken = formatToken(token);
+        const prob = confidence ? (confidence.max_prob * 100).toFixed(1) + '%' : '-';
         
-        html += `<span class="token generated-token ${entropyClass}" 
+        html += `<span class="token generated-token ${colorClass}" 
                        data-index="${idx}" 
                        data-entropy="${entropy.toFixed(3)}"
-                       title="熵: ${entropy.toFixed(3)}">${displayToken}</span>`;
+                       data-prob="${prob}"
+                       title="熵: ${entropy.toFixed(3)} | 概率: ${prob}">${displayToken}</span>`;
     });
     html += '</div>';
     
@@ -566,6 +637,26 @@ function renderTokens(result) {
             selectToken(index);
         });
     });
+}
+
+/**
+ * 处理 Token 颜色模式变化
+ */
+function handleTokenColorModeChange() {
+    AppState.tokenColorMode = Elements.tokenColorMode.value;
+    
+    // 重新渲染 tokens
+    if (AppState.generationResult) {
+        renderTokens(AppState.generationResult);
+        
+        // 恢复选中状态
+        if (AppState.selectedTokenIndex !== null) {
+            const tokens = Elements.tokenDisplay.querySelectorAll('.generated-token');
+            tokens.forEach((t, i) => {
+                t.classList.toggle('selected', i === AppState.selectedTokenIndex);
+            });
+        }
+    }
 }
 
 /**
@@ -630,14 +721,37 @@ async function selectToken(index) {
     const result = AppState.generationResult;
     const token = result.generated_tokens[index];
     const entropy = result.analysis.entropies[index];
+    const confidence = result.analysis.confidence_curve[index];
     
     Elements.selectedTokenInfo.style.display = 'block';
     Elements.selectedToken.textContent = `"${token}"`;
     Elements.selectedPosition.textContent = index;
     Elements.selectedEntropy.textContent = entropy.toFixed(4);
     
+    // 显示概率和 logit
+    if (confidence) {
+        Elements.selectedProb.textContent = (confidence.max_prob * 100).toFixed(2) + '%';
+    }
+    
+    // 获取 logit 值（需要从原始 logits 计算）
+    // 先显示占位符，然后通过 API 获取详细信息
+    Elements.selectedLogit.textContent = '-';
+    
     // 获取并显示概率分布和归因
-    await updateProbsChart(index);
+    const probsData = await updateProbsChart(index);
+    
+    // 更新 logit 显示（从概率分布数据中获取）
+    if (probsData && probsData.top_k_tokens && probsData.top_k_tokens.length > 0) {
+        // 找到实际生成的 token 的 logit
+        const actualTokenInfo = probsData.top_k_tokens.find(t => t.token === token);
+        if (actualTokenInfo) {
+            Elements.selectedLogit.textContent = actualTokenInfo.logit.toFixed(2);
+        } else if (probsData.top_k_tokens[0]) {
+            // 如果找不到，显示 top-1 的 logit
+            Elements.selectedLogit.textContent = probsData.top_k_tokens[0].logit.toFixed(2);
+        }
+    }
+    
     await updateAttributionChart();
     
     // 切换到 Token 分析组的概率分布标签页
@@ -768,9 +882,10 @@ async function updateHeadEntropyChart() {
 
 /**
  * 更新概率分布图
+ * @returns {Object|null} 返回概率数据用于显示详情
  */
 async function updateProbsChart(position) {
-    if (!AppState.generationResult) return;
+    if (!AppState.generationResult) return null;
     
     try {
         const topN = parseInt(Elements.topNProbs.value);
@@ -778,10 +893,12 @@ async function updateProbsChart(position) {
         
         if (data.success) {
             Charts.renderProbsChart(data);
+            return data;
         }
     } catch (error) {
         console.error('Probs chart error:', error);
     }
+    return null;
 }
 
 /**
@@ -795,8 +912,26 @@ function updateEntropyChart() {
     Charts.renderEntropyChart({
         entropies_bits: analysis.entropies_bits,
         generated_tokens: generated_tokens,
-        mean_entropy: analysis.mean_entropy
+        mean_entropy: analysis.mean_entropy,
+        sortMode: AppState.entropySortMode,
+        percentile: AppState.entropyPercentile
     });
+}
+
+/**
+ * 处理熵排序模式变化
+ */
+function handleEntropySortChange() {
+    AppState.entropySortMode = Elements.entropySortMode.value;
+    updateEntropyChart();
+}
+
+/**
+ * 处理熵百分位数变化
+ */
+function handleEntropyPercentileChange() {
+    AppState.entropyPercentile = parseInt(Elements.entropyPercentile.value) || 75;
+    updateEntropyChart();
 }
 
 /**
