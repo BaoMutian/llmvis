@@ -225,8 +225,9 @@ class ModelService:
                 # 更新输入
                 current_ids = torch.cat([current_ids, next_token], dim=1)
         
-        # 获取输入tokens
-        input_tokens = self.tokenizer.convert_ids_to_tokens(input_ids[0].tolist())
+        # 获取输入tokens（逐个解码以正确显示中文等字符）
+        input_token_ids = input_ids[0].tolist()
+        input_tokens = [self.tokenizer.decode([tid]) for tid in input_token_ids]
         
         # 构建完整的token序列（用于注意力可视化）
         all_tokens = input_tokens + generated_tokens

@@ -54,7 +54,12 @@ const Elements = {
     
     // 标签页
     tabBtns: null,
-    tabContents: null
+    tabContents: null,
+    
+    // 布局
+    mainContent: null,
+    resizeHandle: null,
+    rightPanel: null
 };
 
 /**
@@ -95,6 +100,10 @@ function initElements() {
     
     Elements.tabBtns = document.querySelectorAll('.tab-btn');
     Elements.tabContents = document.querySelectorAll('.tab-content');
+    
+    Elements.mainContent = document.querySelector('.main-content');
+    Elements.resizeHandle = document.getElementById('resizeHandle');
+    Elements.rightPanel = document.getElementById('rightPanel');
 }
 
 /**
@@ -127,6 +136,59 @@ function setupEventListeners() {
             handleGenerate();
         }
     });
+    
+    // 右侧面板拖动调整宽度
+    setupResizeHandle();
+}
+
+/**
+ * 设置拖动调整宽度
+ */
+function setupResizeHandle() {
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+    
+    const handle = Elements.resizeHandle;
+    const panel = Elements.rightPanel;
+    const mainContent = Elements.mainContent;
+    
+    if (!handle || !panel) return;
+    
+    handle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = panel.offsetWidth;
+        handle.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        
+        const deltaX = startX - e.clientX;
+        const newWidth = Math.max(300, Math.min(800, startWidth + deltaX));
+        
+        // 更新 grid 布局
+        mainContent.style.gridTemplateColumns = `280px 1fr 8px ${newWidth}px`;
+        
+        // 调整图表大小
+        Charts.resizeCharts();
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            handle.classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            
+            // 最终调整图表大小
+            setTimeout(() => Charts.resizeCharts(), 100);
+        }
+    });
 }
 
 /**
@@ -157,8 +219,12 @@ function switchTab(tabName) {
         content.classList.toggle('active', isActive);
     });
     
-    // 切换后调整图表大小
-    setTimeout(() => Charts.resizeCharts(), 100);
+    // 切换后调整图表大小（需要多次延迟确保渲染完成）
+    setTimeout(() => {
+        Charts.resizeCharts();
+        // 再次延迟确保图表完全渲染
+        setTimeout(() => Charts.resizeCharts(), 200);
+    }, 50);
 }
 
 /**
