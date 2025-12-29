@@ -561,7 +561,12 @@ function updateStats(result) {
  * 更新所有图表
  */
 async function updateAllCharts() {
+    // 注意力分析组
     await updateAttentionChart();
+    await updateMultiheadChart();
+    await updateHeadEntropyChart();
+    
+    // 归因分析组
     updateEntropyChart();
     updateConfidenceChart();
     
@@ -572,11 +577,13 @@ async function updateAllCharts() {
 }
 
 /**
- * 更新注意力热力图
+ * 更新注意力相关图表（层变化时）
  */
 async function handleAttentionLayerChange(value) {
     if (AppState.generationResult) {
         await updateAttentionChart();
+        await updateMultiheadChart();
+        await updateHeadEntropyChart();
     }
 }
 
@@ -606,6 +613,47 @@ async function updateAttentionChart() {
         }
     } catch (error) {
         console.error('Attention chart error:', error);
+    }
+}
+
+/**
+ * 更新多头注意力对比图
+ */
+async function updateMultiheadChart() {
+    if (!AppState.generationResult) return;
+    
+    try {
+        const layer = parseInt(Elements.attentionLayer.value);
+        // 默认选择 0-3 步骤为最后一步，取前4个头
+        const numSteps = AppState.generationResult.generated_tokens.length;
+        const step = numSteps > 0 ? numSteps - 1 : 0;
+        
+        const data = await API.getMultiheadAttention(layer, step, "0,1,2,3,4,5");
+        
+        if (data.success) {
+            Charts.renderMultiheadChart(data);
+        }
+    } catch (error) {
+        console.error('Multihead chart error:', error);
+    }
+}
+
+/**
+ * 更新注意力头熵分析图
+ */
+async function updateHeadEntropyChart() {
+    if (!AppState.generationResult) return;
+    
+    try {
+        const layer = parseInt(Elements.attentionLayer.value);
+        
+        const data = await API.getAttentionHeadEntropy(layer);
+        
+        if (data.success) {
+            Charts.renderHeadEntropyChart(data);
+        }
+    } catch (error) {
+        console.error('Head entropy chart error:', error);
     }
 }
 

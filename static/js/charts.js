@@ -610,6 +610,538 @@ function renderConfidenceChart(data) {
 }
 
 /**
+ * 渲染多头注意力对比图
+ * @param {Object} data - 多头注意力数据
+ */
+function renderMultiheadChart(data) {
+    const chart = chartInstances.multihead;
+    if (!chart) return;
+    
+    const { layer, step, generated_token, heads, x_labels } = data;
+    
+    if (!heads || heads.length === 0) {
+        chart.clear();
+        return;
+    }
+    
+    // 为每个头生成一个系列
+    const series = heads.map((headData, idx) => ({
+        name: `Head ${headData.head_idx}`,
+        type: 'line',
+        data: headData.attention,
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 3,
+        lineStyle: { width: 2 }
+    }));
+    
+    const cleanLabels = x_labels.map(l => l ? l.substring(0, 8) : '');
+    
+    const option = {
+        backgroundColor: 'transparent',
+        title: {
+            text: `多头注意力对比 - Layer ${layer}`,
+            subtext: `生成 Token: "${generated_token}"`,
+            left: 'center',
+            textStyle: { color: CHART_COLORS.textPrimary, fontSize: 14, fontWeight: 'normal' },
+            subtextStyle: { color: CHART_COLORS.textSecondary, fontSize: 11 }
+        },
+        tooltip: {
+            trigger: 'axis',
+            backgroundColor: CHART_COLORS.bgElevated,
+            borderColor: CHART_COLORS.border,
+            textStyle: { color: CHART_COLORS.textPrimary }
+        },
+        legend: {
+            data: heads.map(h => `Head ${h.head_idx}`),
+            top: 50,
+            textStyle: { color: CHART_COLORS.textSecondary, fontSize: 10 }
+        },
+        grid: { left: 50, right: 20, top: 90, bottom: 60 },
+        xAxis: {
+            type: 'category',
+            data: cleanLabels,
+            axisLabel: { color: CHART_COLORS.textDim, fontSize: 8, rotate: 45, interval: Math.floor(cleanLabels.length / 15) },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } }
+        },
+        yAxis: {
+            type: 'value',
+            name: '注意力权重',
+            nameTextStyle: { color: CHART_COLORS.textSecondary, fontSize: 10 },
+            axisLabel: { color: CHART_COLORS.textSecondary, fontSize: 10 },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } },
+            splitLine: { lineStyle: { color: CHART_COLORS.border, opacity: 0.3 } }
+        },
+        series: series
+    };
+    
+    chart.setOption(option, true);
+}
+
+/**
+ * 渲染注意力头熵分析图
+ * @param {Object} data - 注意力头熵数据
+ */
+function renderHeadEntropyChart(data) {
+    const chart = chartInstances.headEntropy;
+    if (!chart) return;
+    
+    const { layer, head_entropies, num_heads } = data;
+    
+    if (!head_entropies || head_entropies.length === 0) {
+        chart.clear();
+        return;
+    }
+    
+    const headLabels = head_entropies.map(h => `H${h.head_idx}`);
+    const entropies = head_entropies.map(h => h.mean_entropy);
+    
+    // 根据熵值计算颜色（低熵=绿色/聚焦，高熵=橙色/分散）
+    const maxEntropy = Math.max(...entropies);
+    const minEntropy = Math.min(...entropies);
+    
+    const option = {
+        backgroundColor: 'transparent',
+        title: {
+            text: `注意力头熵分析 - Layer ${layer}`,
+            subtext: '低熵=聚焦型 | 高熵=分散型',
+            left: 'center',
+            textStyle: { color: CHART_COLORS.textPrimary, fontSize: 14, fontWeight: 'normal' },
+            subtextStyle: { color: CHART_COLORS.textSecondary, fontSize: 11 }
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            formatter: function(params) {
+                const item = params[0];
+                const headData = head_entropies[item.dataIndex];
+                return `
+                    <div style="font-family: monospace;">
+                        <div>Head ${headData.head_idx}</div>
+                        <div>平均熵: <b>${headData.mean_entropy.toFixed(4)}</b></div>
+                    </div>
+                `;
+            },
+            backgroundColor: CHART_COLORS.bgElevated,
+            borderColor: CHART_COLORS.border,
+            textStyle: { color: CHART_COLORS.textPrimary }
+        },
+        grid: { left: 60, right: 20, top: 70, bottom: 50 },
+        xAxis: {
+            type: 'category',
+            data: headLabels,
+            axisLabel: { color: CHART_COLORS.textSecondary, fontSize: 9 },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } }
+        },
+        yAxis: {
+            type: 'value',
+            name: '熵',
+            nameTextStyle: { color: CHART_COLORS.textSecondary, fontSize: 10 },
+            axisLabel: { color: CHART_COLORS.textSecondary },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } },
+            splitLine: { lineStyle: { color: CHART_COLORS.border, opacity: 0.3 } }
+        },
+        series: [{
+            type: 'bar',
+            data: entropies.map((e, i) => {
+                const ratio = (e - minEntropy) / (maxEntropy - minEntropy + 0.001);
+                return {
+                    value: e,
+                    itemStyle: {
+                        color: ratio < 0.3 ? CHART_COLORS.primary : 
+                               ratio > 0.7 ? CHART_COLORS.warning : CHART_COLORS.accent
+                    }
+                };
+            }),
+            barWidth: '60%'
+        }]
+    };
+    
+    chart.setOption(option, true);
+}
+
+/**
+ * 渲染 Hidden States 层间相似度热力图
+ * @param {Object} data - 相似度数据
+ */
+function renderHiddenSimilarityChart(data) {
+    const chart = chartInstances.hiddenSimilarity;
+    if (!chart) return;
+    
+    const { similarity_matrix, num_layers, step } = data;
+    
+    if (!similarity_matrix || similarity_matrix.length === 0) {
+        chart.clear();
+        return;
+    }
+    
+    // 转换为热力图数据
+    const heatmapData = [];
+    for (let y = 0; y < similarity_matrix.length; y++) {
+        for (let x = 0; x < similarity_matrix[y].length; x++) {
+            heatmapData.push([x, y, similarity_matrix[y][x]]);
+        }
+    }
+    
+    const layerLabels = Array.from({length: num_layers}, (_, i) => `L${i}`);
+    
+    const option = {
+        backgroundColor: 'transparent',
+        title: {
+            text: '层间隐藏状态相似度',
+            left: 'center',
+            textStyle: { color: CHART_COLORS.textPrimary, fontSize: 14, fontWeight: 'normal' }
+        },
+        tooltip: {
+            formatter: (params) => `Layer ${params.data[0]} vs Layer ${params.data[1]}: ${params.data[2].toFixed(4)}`,
+            backgroundColor: CHART_COLORS.bgElevated,
+            borderColor: CHART_COLORS.border,
+            textStyle: { color: CHART_COLORS.textPrimary }
+        },
+        grid: { left: 50, right: 80, top: 50, bottom: 50 },
+        xAxis: {
+            type: 'category',
+            data: layerLabels,
+            axisLabel: { color: CHART_COLORS.textDim, fontSize: 8 },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } }
+        },
+        yAxis: {
+            type: 'category',
+            data: layerLabels,
+            axisLabel: { color: CHART_COLORS.textDim, fontSize: 8 },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } }
+        },
+        visualMap: {
+            min: 0, max: 1,
+            calculable: true, orient: 'vertical', right: 10, top: 'center',
+            inRange: { color: [CHART_COLORS.bgSurface, CHART_COLORS.primary] },
+            textStyle: { color: CHART_COLORS.textSecondary }
+        },
+        series: [{ type: 'heatmap', data: heatmapData }]
+    };
+    
+    chart.setOption(option, true);
+}
+
+/**
+ * 渲染 Logits Lens 图
+ * @param {Object} data - Logits Lens 数据
+ */
+function renderLogitsLensChart(data) {
+    const chart = chartInstances.logitsLens;
+    if (!chart) return;
+    
+    const { layer_predictions, num_layers, step, actual_token } = data;
+    
+    if (!layer_predictions || layer_predictions.length === 0) {
+        chart.clear();
+        return;
+    }
+    
+    // 构建热力图：层 x Top-K tokens
+    const topK = layer_predictions[0]?.top_tokens?.length || 5;
+    const heatmapData = [];
+    const allTokens = new Set();
+    
+    layer_predictions.forEach((lp, layerIdx) => {
+        lp.top_tokens?.forEach((t, rank) => {
+            allTokens.add(t.token);
+            heatmapData.push([rank, layerIdx, t.probability]);
+        });
+    });
+    
+    const layerLabels = layer_predictions.map((_, i) => `L${i}`);
+    const rankLabels = Array.from({length: topK}, (_, i) => `#${i+1}`);
+    
+    const option = {
+        backgroundColor: 'transparent',
+        title: {
+            text: 'Logits Lens - 层间预测演变',
+            subtext: `实际生成: "${actual_token}"`,
+            left: 'center',
+            textStyle: { color: CHART_COLORS.textPrimary, fontSize: 14, fontWeight: 'normal' },
+            subtextStyle: { color: CHART_COLORS.textSecondary, fontSize: 11 }
+        },
+        tooltip: {
+            formatter: (params) => {
+                const layer = params.data[1];
+                const rank = params.data[0];
+                const lp = layer_predictions[layer];
+                const token = lp?.top_tokens?.[rank]?.token || '';
+                return `Layer ${layer} #${rank+1}: "${token}" (${(params.data[2]*100).toFixed(1)}%)`;
+            },
+            backgroundColor: CHART_COLORS.bgElevated,
+            borderColor: CHART_COLORS.border,
+            textStyle: { color: CHART_COLORS.textPrimary }
+        },
+        grid: { left: 50, right: 80, top: 70, bottom: 50 },
+        xAxis: {
+            type: 'category', data: rankLabels,
+            axisLabel: { color: CHART_COLORS.textSecondary, fontSize: 10 },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } }
+        },
+        yAxis: {
+            type: 'category', data: layerLabels, inverse: true,
+            axisLabel: { color: CHART_COLORS.textDim, fontSize: 8 },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } }
+        },
+        visualMap: {
+            min: 0, max: 1, calculable: true, orient: 'vertical', right: 10, top: 'center',
+            inRange: { color: [CHART_COLORS.bgSurface, CHART_COLORS.primaryDim, CHART_COLORS.primary] },
+            textStyle: { color: CHART_COLORS.textSecondary }
+        },
+        series: [{ type: 'heatmap', data: heatmapData }]
+    };
+    
+    chart.setOption(option, true);
+}
+
+/**
+ * 渲染残差流分析图
+ * @param {Object} data - 残差流数据
+ */
+function renderResidualChart(data) {
+    const chart = chartInstances.residual;
+    if (!chart) return;
+    
+    const { layer_norms, residual_contributions, num_layers } = data;
+    
+    if (!layer_norms || layer_norms.length === 0) {
+        chart.clear();
+        return;
+    }
+    
+    const layerLabels = Array.from({length: num_layers}, (_, i) => `L${i}`);
+    
+    const option = {
+        backgroundColor: 'transparent',
+        title: {
+            text: '残差流分析',
+            subtext: '每层对残差流的贡献',
+            left: 'center',
+            textStyle: { color: CHART_COLORS.textPrimary, fontSize: 14, fontWeight: 'normal' },
+            subtextStyle: { color: CHART_COLORS.textSecondary, fontSize: 11 }
+        },
+        tooltip: {
+            trigger: 'axis',
+            backgroundColor: CHART_COLORS.bgElevated,
+            borderColor: CHART_COLORS.border,
+            textStyle: { color: CHART_COLORS.textPrimary }
+        },
+        legend: {
+            data: ['隐藏状态范数', '残差贡献'],
+            top: 50,
+            textStyle: { color: CHART_COLORS.textSecondary, fontSize: 10 }
+        },
+        grid: { left: 60, right: 20, top: 90, bottom: 50 },
+        xAxis: {
+            type: 'category', data: layerLabels,
+            axisLabel: { color: CHART_COLORS.textDim, fontSize: 8 },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } }
+        },
+        yAxis: {
+            type: 'value', name: '范数',
+            nameTextStyle: { color: CHART_COLORS.textSecondary, fontSize: 10 },
+            axisLabel: { color: CHART_COLORS.textSecondary },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } },
+            splitLine: { lineStyle: { color: CHART_COLORS.border, opacity: 0.3 } }
+        },
+        series: [
+            {
+                name: '隐藏状态范数', type: 'line', data: layer_norms,
+                smooth: true, lineStyle: { color: CHART_COLORS.primary, width: 2 },
+                itemStyle: { color: CHART_COLORS.primary }
+            },
+            {
+                name: '残差贡献', type: 'bar', data: residual_contributions,
+                itemStyle: { color: CHART_COLORS.accent, opacity: 0.7 }
+            }
+        ]
+    };
+    
+    chart.setOption(option, true);
+}
+
+/**
+ * 渲染 Token Embedding 投影图
+ * @param {Object} data - Embedding 数据
+ */
+function renderEmbeddingChart(data) {
+    const chart = chartInstances.embedding;
+    if (!chart) return;
+    
+    const { embeddings, tokens, token_types } = data;
+    
+    if (!embeddings || embeddings.length === 0) {
+        chart.clear();
+        return;
+    }
+    
+    // 按类型分组
+    const inputPoints = [], outputPoints = [];
+    embeddings.forEach((emb, i) => {
+        const point = { value: [emb[0], emb[1]], name: tokens[i] };
+        if (token_types[i] === 'input') inputPoints.push(point);
+        else outputPoints.push(point);
+    });
+    
+    const option = {
+        backgroundColor: 'transparent',
+        title: {
+            text: 'Token Embedding 投影',
+            subtext: 'PCA 降维可视化',
+            left: 'center',
+            textStyle: { color: CHART_COLORS.textPrimary, fontSize: 14, fontWeight: 'normal' },
+            subtextStyle: { color: CHART_COLORS.textSecondary, fontSize: 11 }
+        },
+        tooltip: {
+            formatter: (params) => `"${params.name}"`,
+            backgroundColor: CHART_COLORS.bgElevated,
+            borderColor: CHART_COLORS.border,
+            textStyle: { color: CHART_COLORS.textPrimary }
+        },
+        legend: {
+            data: ['输入 Token', '生成 Token'],
+            top: 50,
+            textStyle: { color: CHART_COLORS.textSecondary, fontSize: 10 }
+        },
+        grid: { left: 50, right: 20, top: 80, bottom: 50 },
+        xAxis: { type: 'value', axisLine: { lineStyle: { color: CHART_COLORS.border } }, splitLine: { show: false } },
+        yAxis: { type: 'value', axisLine: { lineStyle: { color: CHART_COLORS.border } }, splitLine: { show: false } },
+        series: [
+            {
+                name: '输入 Token', type: 'scatter', data: inputPoints,
+                symbolSize: 8, itemStyle: { color: CHART_COLORS.textDim }
+            },
+            {
+                name: '生成 Token', type: 'scatter', data: outputPoints,
+                symbolSize: 10, itemStyle: { color: CHART_COLORS.primary }
+            }
+        ]
+    };
+    
+    chart.setOption(option, true);
+}
+
+/**
+ * 渲染激活值分布图
+ * @param {Object} data - 激活值数据
+ */
+function renderActivationChart(data) {
+    const chart = chartInstances.activation;
+    if (!chart) return;
+    
+    const { layer, mlp_stats, attention_stats, histogram } = data;
+    
+    if (!histogram) {
+        chart.clear();
+        return;
+    }
+    
+    const option = {
+        backgroundColor: 'transparent',
+        title: {
+            text: `激活值分布 - Layer ${layer}`,
+            left: 'center',
+            textStyle: { color: CHART_COLORS.textPrimary, fontSize: 14, fontWeight: 'normal' }
+        },
+        tooltip: {
+            trigger: 'axis',
+            backgroundColor: CHART_COLORS.bgElevated,
+            borderColor: CHART_COLORS.border,
+            textStyle: { color: CHART_COLORS.textPrimary }
+        },
+        legend: {
+            data: ['MLP', 'Attention'],
+            top: 30,
+            textStyle: { color: CHART_COLORS.textSecondary, fontSize: 10 }
+        },
+        grid: { left: 60, right: 20, top: 70, bottom: 50 },
+        xAxis: {
+            type: 'category', data: histogram.bins,
+            axisLabel: { color: CHART_COLORS.textSecondary, fontSize: 9 },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } }
+        },
+        yAxis: {
+            type: 'value', name: '频数',
+            nameTextStyle: { color: CHART_COLORS.textSecondary, fontSize: 10 },
+            axisLabel: { color: CHART_COLORS.textSecondary },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } },
+            splitLine: { lineStyle: { color: CHART_COLORS.border, opacity: 0.3 } }
+        },
+        series: [
+            { name: 'MLP', type: 'bar', data: histogram.mlp_counts, itemStyle: { color: CHART_COLORS.primary, opacity: 0.7 } },
+            { name: 'Attention', type: 'bar', data: histogram.attn_counts, itemStyle: { color: CHART_COLORS.accent, opacity: 0.7 } }
+        ]
+    };
+    
+    chart.setOption(option, true);
+}
+
+/**
+ * 渲染输入归因热力图
+ * @param {Object} data - 归因数据
+ */
+function renderAttributionChart(data) {
+    const chart = chartInstances.attribution;
+    if (!chart) return;
+    
+    const { attributions, input_tokens, output_token, output_idx } = data;
+    
+    if (!attributions || attributions.length === 0) {
+        chart.clear();
+        return;
+    }
+    
+    const cleanTokens = input_tokens.map(t => t ? t.substring(0, 10) : '');
+    
+    const option = {
+        backgroundColor: 'transparent',
+        title: {
+            text: '输入归因分析',
+            subtext: `输出 Token: "${output_token}"`,
+            left: 'center',
+            textStyle: { color: CHART_COLORS.textPrimary, fontSize: 14, fontWeight: 'normal' },
+            subtextStyle: { color: CHART_COLORS.textSecondary, fontSize: 11 }
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            formatter: (params) => {
+                const idx = params[0].dataIndex;
+                return `"${input_tokens[idx]}": ${attributions[idx].toFixed(4)}`;
+            },
+            backgroundColor: CHART_COLORS.bgElevated,
+            borderColor: CHART_COLORS.border,
+            textStyle: { color: CHART_COLORS.textPrimary }
+        },
+        grid: { left: 60, right: 20, top: 70, bottom: 80 },
+        xAxis: {
+            type: 'category', data: cleanTokens,
+            axisLabel: { color: CHART_COLORS.textDim, fontSize: 9, rotate: 45 },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } }
+        },
+        yAxis: {
+            type: 'value', name: '归因分数',
+            nameTextStyle: { color: CHART_COLORS.textSecondary, fontSize: 10 },
+            axisLabel: { color: CHART_COLORS.textSecondary },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } },
+            splitLine: { lineStyle: { color: CHART_COLORS.border, opacity: 0.3 } }
+        },
+        series: [{
+            type: 'bar',
+            data: attributions.map(a => ({
+                value: a,
+                itemStyle: { color: a > 0 ? CHART_COLORS.primary : CHART_COLORS.danger }
+            })),
+            barWidth: '60%'
+        }]
+    };
+    
+    chart.setOption(option, true);
+}
+
+/**
  * 清空所有图表
  */
 function clearAllCharts() {
@@ -634,6 +1166,14 @@ window.Charts = {
     renderProbsChart,
     renderEntropyChart,
     renderConfidenceChart,
+    renderMultiheadChart,
+    renderHeadEntropyChart,
+    renderHiddenSimilarityChart,
+    renderLogitsLensChart,
+    renderResidualChart,
+    renderEmbeddingChart,
+    renderActivationChart,
+    renderAttributionChart,
     clearAllCharts,
     resizeCharts
 };

@@ -218,6 +218,133 @@ def get_attention():
         }), 500
 
 
+@app.route("/api/attention/multihead", methods=["GET"])
+def get_multihead_attention():
+    """获取多个注意力头的数据用于对比"""
+    global latest_result
+
+    if latest_result is None:
+        return jsonify({
+            "success": False,
+            "message": "No generation result available. Please generate first."
+        }), 400
+
+    layer_idx = int(request.args.get("layer", 0))
+    step_idx = int(request.args.get("step", 0))  # 生成步骤索引
+    heads = request.args.get("heads", "0,1,2,3")  # 要对比的头索引，逗号分隔
+
+    num_layers = latest_result["num_layers"]
+    num_heads = latest_result["num_heads"]
+    num_steps = len(latest_result["generated_tokens"])
+
+    if layer_idx < 0 or layer_idx >= num_layers:
+        return jsonify({"success": False, "message": f"Invalid layer. Must be 0-{num_layers-1}"}), 400
+    if step_idx < 0 or step_idx >= num_steps:
+        return jsonify({"success": False, "message": f"Invalid step. Must be 0-{num_steps-1}"}), 400
+
+    try:
+        head_indices = [int(h.strip()) for h in heads.split(",") if h.strip()]
+        head_indices = [h for h in head_indices if 0 <= h < num_heads][:6]  # 最多6个头
+
+        result_heads = []
+        attentions = latest_result["attentions"]
+
+        for head_idx in head_indices:
+            # 获取该步骤该层该头的注意力
+            step_attn = attentions[step_idx][layer_idx]  # [heads, seq_len]
+            attn_weights = step_attn[head_idx, :].tolist()
+
+            result_heads.append({
+                "head_idx": head_idx,
+                "attention": attn_weights
+            })
+
+        # 获取 x 轴标签
+        all_tokens = latest_result["all_tokens"]
+        seq_len = len(attentions[step_idx][layer_idx][0])
+        x_labels = all_tokens[:seq_len]
+
+        return jsonify({
+            "success": True,
+            "layer": layer_idx,
+            "step": step_idx,
+            "generated_token": latest_result["generated_tokens"][step_idx],
+            "heads": result_heads,
+            "x_labels": x_labels,
+            "num_heads": num_heads
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/attention/head_entropy", methods=["GET"])
+def get_attention_head_entropy():
+    """获取所有注意力头的熵分析"""
+    global latest_result
+
+    if latest_result is None:
+        return jsonify({
+            "success": False,
+            "message": "No generation result available. Please generate first."
+        }), 400
+
+    layer_idx = int(request.args.get("layer", 0))
+    step_idx = request.args.get("step", None)  # None 表示所有步骤的平均
+
+    num_layers = latest_result["num_layers"]
+    num_heads = latest_result["num_heads"]
+    num_steps = len(latest_result["generated_tokens"])
+
+    if layer_idx < 0 or layer_idx >= num_layers:
+        return jsonify({"success": False, "message": f"Invalid layer. Must be 0-{num_layers-1}"}), 400
+
+    try:
+        attentions = latest_result["attentions"]
+        head_entropies = []
+
+        if step_idx is not None:
+            step_idx = int(step_idx)
+            if step_idx < 0 or step_idx >= num_steps:
+                return jsonify({"success": False, "message": f"Invalid step"}), 400
+            steps_to_process = [step_idx]
+        else:
+            steps_to_process = range(num_steps)
+
+        # 计算每个头的熵
+        for head_idx in range(num_heads):
+            entropies = []
+            for s in steps_to_process:
+                attn_weights = attentions[s][layer_idx][head_idx, :]
+                entropy = analysis.compute_attention_entropy(attn_weights)
+                entropies.append(entropy)
+
+            head_entropies.append({
+                "head_idx": head_idx,
+                "mean_entropy": float(np.mean(entropies)),
+                "entropies": entropies if step_idx is not None else None
+            })
+
+        # 按熵值排序
+        head_entropies.sort(key=lambda x: x["mean_entropy"])
+
+        return jsonify({
+            "success": True,
+            "layer": layer_idx,
+            "step": step_idx,
+            "head_entropies": head_entropies,
+            "num_heads": num_heads,
+            "num_steps": num_steps
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 @app.route("/api/token_probs", methods=["GET"])
 def get_token_probs():
     """获取指定位置的token概率分布"""

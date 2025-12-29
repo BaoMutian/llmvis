@@ -100,6 +100,74 @@ const API = {
      */
     async getLayerSimilarity(step) {
         return await request(`/api/layer_similarity?step=${step}`);
+    },
+    
+    /**
+     * 获取多头注意力对比数据
+     * @param {number} layer - 层索引
+     * @param {number} step - 生成步骤索引
+     * @param {string} heads - 头索引，逗号分隔
+     */
+    async getMultiheadAttention(layer, step, heads = "0,1,2,3") {
+        return await request(`/api/attention/multihead?layer=${layer}&step=${step}&heads=${heads}`);
+    },
+    
+    /**
+     * 获取注意力头熵分析
+     * @param {number} layer - 层索引
+     * @param {number|null} step - 步骤索引，null表示所有步骤平均
+     */
+    async getAttentionHeadEntropy(layer, step = null) {
+        let url = `/api/attention/head_entropy?layer=${layer}`;
+        if (step !== null) url += `&step=${step}`;
+        return await request(url);
+    },
+    
+    /**
+     * 获取 Hidden States 层间相似度
+     * @param {number} step - 步骤索引
+     */
+    async getHiddenStatesSimilarity(step) {
+        return await request(`/api/analyze/hidden_states?step=${step}`);
+    },
+    
+    /**
+     * 获取残差流分析
+     * @param {number} step - 步骤索引
+     */
+    async getResidualAnalysis(step) {
+        return await request(`/api/analyze/residual?step=${step}`);
+    },
+    
+    /**
+     * 获取 Logits Lens 分析
+     * @param {number} step - 步骤索引
+     */
+    async getLogitsLens(step) {
+        return await request(`/api/analyze/logits_lens?step=${step}`);
+    },
+    
+    /**
+     * 获取 Token Embedding 投影
+     */
+    async getEmbeddingProjection() {
+        return await request(`/api/analyze/embeddings`);
+    },
+    
+    /**
+     * 获取激活值分布
+     * @param {number} layer - 层索引
+     */
+    async getActivationStats(layer) {
+        return await request(`/api/analyze/activations?layer=${layer}`);
+    },
+    
+    /**
+     * 获取输入归因
+     * @param {number} outputIdx - 输出token索引
+     */
+    async getInputAttribution(outputIdx) {
+        return await request(`/api/analyze/attribution?output_idx=${outputIdx}`);
     }
 };
 
