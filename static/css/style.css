@@ -279,10 +279,20 @@ html, body {
     display: flex;
     gap: var(--spacing-sm);
     margin-bottom: var(--spacing-sm);
+    align-items: center;
+    width: 100%;
+}
+
+.model-path-input .text-input {
+    flex: 1;
+    min-width: 0;  /* 防止 flex 子元素溢出 */
+}
+
+.model-path-input .btn-secondary {
+    flex-shrink: 0;  /* 按钮不收缩 */
 }
 
 .text-input {
-    flex: 1;
     padding: var(--spacing-sm) var(--spacing-md);
     background: var(--bg-elevated);
     border: 1px solid var(--border-color);
