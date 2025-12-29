@@ -15,7 +15,8 @@ const AppState = {
         attribution: 'attr-entropy'
     },
     numLayers: 36,
-    numHeads: 32
+    numHeads: 32,
+    embeddingDims: 2  // Embedding 投影维度 (2 或 3)
 };
 
 // DOM 元素引用
@@ -74,7 +75,11 @@ const Elements = {
     // 布局
     mainContent: null,
     resizeHandle: null,
-    rightPanel: null
+    rightPanel: null,
+    
+    // Embedding 维度切换
+    embedding2D: null,
+    embedding3D: null
 };
 
 /**
@@ -127,6 +132,9 @@ function initElements() {
     Elements.mainContent = document.querySelector('.main-content');
     Elements.resizeHandle = document.getElementById('resizeHandle');
     Elements.rightPanel = document.getElementById('rightPanel');
+    
+    Elements.embedding2D = document.getElementById('embedding2D');
+    Elements.embedding3D = document.getElementById('embedding3D');
 }
 
 /**
@@ -168,8 +176,30 @@ function setupEventListeners() {
         }
     });
     
+    // Embedding 2D/3D 切换
+    if (Elements.embedding2D) {
+        Elements.embedding2D.addEventListener('click', () => switchEmbeddingDims(2));
+    }
+    if (Elements.embedding3D) {
+        Elements.embedding3D.addEventListener('click', () => switchEmbeddingDims(3));
+    }
+    
     // 右侧面板拖动调整宽度
     setupResizeHandle();
+}
+
+/**
+ * 切换 Embedding 投影维度
+ */
+async function switchEmbeddingDims(dims) {
+    AppState.embeddingDims = dims;
+    
+    // 更新按钮状态
+    if (Elements.embedding2D) Elements.embedding2D.classList.toggle('active', dims === 2);
+    if (Elements.embedding3D) Elements.embedding3D.classList.toggle('active', dims === 3);
+    
+    // 更新图表
+    await updateEmbeddingChart(dims);
 }
 
 /**
@@ -846,12 +876,18 @@ async function updateResidualChart() {
 
 /**
  * 更新 Embedding 投影图
+ * @param {number} dims - 维度 (2 或 3)
  */
-async function updateEmbeddingChart() {
+async function updateEmbeddingChart(dims = null) {
     if (!AppState.generationResult) return;
     
+    // 如果没有指定维度，使用当前状态
+    if (dims === null) {
+        dims = AppState.embeddingDims || 2;
+    }
+    
     try {
-        const data = await API.getEmbeddingProjection();
+        const data = await API.getEmbeddingProjection(dims);
         
         if (data.success) {
             Charts.renderEmbeddingChart(data);

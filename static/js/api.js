@@ -149,9 +149,10 @@ const API = {
     
     /**
      * 获取 Token Embedding 投影
+     * @param {number} dims - 维度 (2 或 3)
      */
-    async getEmbeddingProjection() {
-        return await request(`/api/analyze/embeddings`);
+    async getEmbeddingProjection(dims = 2) {
+        return await request(`/api/analyze/embeddings?dims=${dims}`);
     },
     
     /**

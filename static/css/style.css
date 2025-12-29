@@ -777,6 +777,43 @@ input[type="range"]::-webkit-slider-thumb:hover {
     display: flex;
 }
 
+/* Chart Toolbar */
+.chart-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) 0;
+    margin-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.toolbar-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.toolbar-btn {
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 10px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.toolbar-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.toolbar-btn.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--bg-base);
+}
+
 .chart-container {
     flex: 1;
     min-height: 300px;

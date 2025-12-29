@@ -554,7 +554,8 @@ class ModelService:
     def analyze_embeddings(
         self,
         input_ids: List[int],
-        generated_ids: List[int]
+        generated_ids: List[int],
+        n_components: int = 2
     ) -> Dict[str, Any]:
         """
         获取并降维 token embeddings
@@ -562,6 +563,7 @@ class ModelService:
         Args:
             input_ids: 输入token ID列表
             generated_ids: 生成的token ID列表
+            n_components: 降维维度 (2 或 3)
             
         Returns:
             降维后的 embeddings
@@ -572,6 +574,7 @@ class ModelService:
         from sklearn.decomposition import PCA
         
         all_ids = input_ids + generated_ids
+        n_components = min(n_components, 3)  # 最多 3D
         
         with torch.no_grad():
             # 获取 embedding 层
@@ -579,12 +582,14 @@ class ModelService:
             embeddings = embed_tokens(torch.tensor([all_ids]).to(self.device))[0]  # [seq, hidden]
             embeddings_np = embeddings.cpu().numpy()
             
-            # PCA 降维到 2D
-            if embeddings_np.shape[0] > 2:
-                pca = PCA(n_components=2)
+            # PCA 降维
+            if embeddings_np.shape[0] > n_components:
+                pca = PCA(n_components=n_components)
                 reduced = pca.fit_transform(embeddings_np)
+                explained_variance = pca.explained_variance_ratio_.tolist()
             else:
-                reduced = embeddings_np[:, :2]
+                reduced = embeddings_np[:, :n_components]
+                explained_variance = [1.0 / n_components] * n_components
         
         tokens = [self.tokenizer.decode([tid]) for tid in all_ids]
         token_types = ['input'] * len(input_ids) + ['output'] * len(generated_ids)
@@ -592,7 +597,9 @@ class ModelService:
         return {
             "embeddings": reduced.tolist(),
             "tokens": tokens,
-            "token_types": token_types
+            "token_types": token_types,
+            "n_components": n_components,
+            "explained_variance": explained_variance
         }
     
     def analyze_activations(

@@ -963,14 +963,14 @@ function renderResidualChart(data) {
 }
 
 /**
- * 渲染 Token Embedding 投影图
+ * 渲染 Token Embedding 投影图 (2D)
  * @param {Object} data - Embedding 数据
  */
-function renderEmbeddingChart(data) {
+function renderEmbeddingChart2D(data) {
     const chart = chartInstances.embedding;
     if (!chart) return;
     
-    const { embeddings, tokens, token_types } = data;
+    const { embeddings, tokens, token_types, explained_variance } = data;
     
     if (!embeddings || embeddings.length === 0) {
         chart.clear();
@@ -985,11 +985,15 @@ function renderEmbeddingChart(data) {
         else outputPoints.push(point);
     });
     
+    const varianceText = explained_variance 
+        ? `方差解释: ${(explained_variance[0]*100).toFixed(1)}% + ${(explained_variance[1]*100).toFixed(1)}%`
+        : 'PCA 降维';
+    
     const option = {
         backgroundColor: 'transparent',
         title: {
-            text: 'Token Embedding 投影',
-            subtext: 'PCA 降维可视化',
+            text: 'Token Embedding 投影 (2D)',
+            subtext: varianceText,
             left: 'center',
             textStyle: { color: CHART_COLORS.textPrimary, fontSize: 14, fontWeight: 'normal' },
             subtextStyle: { color: CHART_COLORS.textSecondary, fontSize: 11 }
@@ -1006,8 +1010,8 @@ function renderEmbeddingChart(data) {
             textStyle: { color: CHART_COLORS.textSecondary, fontSize: 10 }
         },
         grid: { left: 50, right: 20, top: 80, bottom: 50 },
-        xAxis: { type: 'value', axisLine: { lineStyle: { color: CHART_COLORS.border } }, splitLine: { show: false } },
-        yAxis: { type: 'value', axisLine: { lineStyle: { color: CHART_COLORS.border } }, splitLine: { show: false } },
+        xAxis: { type: 'value', name: 'PC1', axisLine: { lineStyle: { color: CHART_COLORS.border } }, splitLine: { show: false } },
+        yAxis: { type: 'value', name: 'PC2', axisLine: { lineStyle: { color: CHART_COLORS.border } }, splitLine: { show: false } },
         series: [
             {
                 name: '输入 Token', type: 'scatter', data: inputPoints,
@@ -1021,6 +1025,106 @@ function renderEmbeddingChart(data) {
     };
     
     chart.setOption(option, true);
+}
+
+/**
+ * 渲染 Token Embedding 投影图 (3D)
+ * @param {Object} data - Embedding 数据
+ */
+function renderEmbeddingChart3D(data) {
+    const chart = chartInstances.embedding;
+    if (!chart) return;
+    
+    const { embeddings, tokens, token_types, explained_variance } = data;
+    
+    if (!embeddings || embeddings.length === 0) {
+        chart.clear();
+        return;
+    }
+    
+    // 按类型分组
+    const inputPoints = [], outputPoints = [];
+    embeddings.forEach((emb, i) => {
+        const point = { 
+            value: [emb[0], emb[1], emb[2] || 0], 
+            name: tokens[i],
+            itemStyle: { color: token_types[i] === 'input' ? CHART_COLORS.textDim : CHART_COLORS.primary }
+        };
+        if (token_types[i] === 'input') inputPoints.push(point);
+        else outputPoints.push(point);
+    });
+    
+    const varianceText = explained_variance 
+        ? `方差解释: ${explained_variance.map(v => (v*100).toFixed(1) + '%').join(' + ')}`
+        : 'PCA 降维';
+    
+    const option = {
+        backgroundColor: 'transparent',
+        title: {
+            text: 'Token Embedding 投影 (3D)',
+            subtext: varianceText,
+            left: 'center',
+            textStyle: { color: CHART_COLORS.textPrimary, fontSize: 14, fontWeight: 'normal' },
+            subtextStyle: { color: CHART_COLORS.textSecondary, fontSize: 11 }
+        },
+        tooltip: {
+            formatter: (params) => `"${params.name}"`,
+            backgroundColor: CHART_COLORS.bgElevated,
+            borderColor: CHART_COLORS.border,
+            textStyle: { color: CHART_COLORS.textPrimary }
+        },
+        legend: {
+            data: ['输入 Token', '生成 Token'],
+            top: 50,
+            textStyle: { color: CHART_COLORS.textSecondary, fontSize: 10 }
+        },
+        grid3D: {
+            viewControl: {
+                autoRotate: false,
+                rotateSensitivity: 2,
+                zoomSensitivity: 1
+            },
+            axisLine: { lineStyle: { color: CHART_COLORS.border } },
+            axisPointer: { lineStyle: { color: CHART_COLORS.primary } },
+            light: {
+                main: { intensity: 1.2 },
+                ambient: { intensity: 0.3 }
+            }
+        },
+        xAxis3D: { type: 'value', name: 'PC1' },
+        yAxis3D: { type: 'value', name: 'PC2' },
+        zAxis3D: { type: 'value', name: 'PC3' },
+        series: [
+            {
+                name: '输入 Token', 
+                type: 'scatter3D', 
+                data: inputPoints,
+                symbolSize: 6,
+                itemStyle: { color: CHART_COLORS.textDim, opacity: 0.8 }
+            },
+            {
+                name: '生成 Token', 
+                type: 'scatter3D', 
+                data: outputPoints,
+                symbolSize: 8,
+                itemStyle: { color: CHART_COLORS.primary, opacity: 0.9 }
+            }
+        ]
+    };
+    
+    chart.setOption(option, true);
+}
+
+/**
+ * 渲染 Token Embedding 投影图（兼容旧接口）
+ * @param {Object} data - Embedding 数据
+ */
+function renderEmbeddingChart(data) {
+    if (data.n_components === 3) {
+        renderEmbeddingChart3D(data);
+    } else {
+        renderEmbeddingChart2D(data);
+    }
 }
 
 /**

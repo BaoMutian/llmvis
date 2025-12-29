@@ -599,6 +599,9 @@ def get_embeddings():
             "message": "No generation result available. Please generate first."
         }), 400
 
+    n_components = int(request.args.get("dims", 2))  # 2D 或 3D
+    n_components = max(2, min(3, n_components))  # 限制为 2 或 3
+
     try:
         prompt = latest_result["prompt"]
         messages = [{"role": "user", "content": prompt}]
@@ -606,7 +609,7 @@ def get_embeddings():
         input_ids = model_service.tokenizer.encode(text, add_special_tokens=False)
         generated_ids = latest_result["generated_token_ids"]
 
-        result = model_service.analyze_embeddings(input_ids, generated_ids)
+        result = model_service.analyze_embeddings(input_ids, generated_ids, n_components)
 
         return jsonify({
             "success": True,

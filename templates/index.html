@@ -6,6 +6,7 @@
     <title>LLM Inference Visualizer</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -244,9 +245,14 @@
                         </div>
                     </div>
                     <div id="tabTokenEmbedding" class="tab-content">
+                        <div class="chart-toolbar">
+                            <label class="toolbar-label">投影维度:</label>
+                            <button id="embedding2D" class="toolbar-btn active">2D</button>
+                            <button id="embedding3D" class="toolbar-btn">3D</button>
+                        </div>
                         <div id="embeddingChart" class="chart-container"></div>
                         <div class="chart-info">
-                            <p>Token embedding的降维投影，观察语义空间分布</p>
+                            <p>Token embedding的降维投影（PCA），观察语义空间分布</p>
                         </div>
                     </div>
                     <div id="tabTokenActivation" class="tab-content">
