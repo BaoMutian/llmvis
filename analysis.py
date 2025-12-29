@@ -36,9 +36,15 @@ def compute_entropy(logits: np.ndarray) -> float:
         熵值（以自然对数为底）
     """
     probs = softmax(logits)
-    # 避免log(0)
-    probs = np.clip(probs, 1e-10, 1.0)
-    entropy = -np.sum(probs * np.log(probs))
+    # 只对非零概率计算熵，避免 0 * log(0) = NaN
+    mask = probs > 1e-10
+    probs_filtered = probs[mask]
+    if len(probs_filtered) == 0:
+        return 0.0
+    entropy = -np.sum(probs_filtered * np.log(probs_filtered))
+    # 确保返回有效数值
+    if np.isnan(entropy) or np.isinf(entropy):
+        return 0.0
     return float(entropy)
 
 
@@ -55,8 +61,15 @@ def compute_entropy_bits(logits: np.ndarray) -> float:
         熵值（以2为底的对数，单位：比特）
     """
     probs = softmax(logits)
-    probs = np.clip(probs, 1e-10, 1.0)
-    entropy = -np.sum(probs * np.log2(probs))
+    # 只对非零概率计算熵，避免 0 * log(0) = NaN
+    mask = probs > 1e-10
+    probs_filtered = probs[mask]
+    if len(probs_filtered) == 0:
+        return 0.0
+    entropy = -np.sum(probs_filtered * np.log2(probs_filtered))
+    # 确保返回有效数值
+    if np.isnan(entropy) or np.isinf(entropy):
+        return 0.0
     return float(entropy)
 
 
@@ -90,17 +103,28 @@ def analyze_generation(logits_list: List[np.ndarray]) -> Dict[str, Any]:
     max_probs = []
     for logits in logits_list:
         probs = softmax(logits)
-        max_probs.append(float(np.max(probs)))
+        max_prob = float(np.max(probs))
+        # 确保不是 NaN
+        if np.isnan(max_prob):
+            max_prob = 0.0
+        max_probs.append(max_prob)
+    
+    # 安全计算统计量
+    def safe_stat(arr, func):
+        if not arr:
+            return 0.0
+        result = func(arr)
+        return 0.0 if np.isnan(result) else float(result)
     
     return {
         "entropies": entropies,
         "entropies_bits": entropies_bits,
-        "mean_entropy": float(np.mean(entropies)),
-        "std_entropy": float(np.std(entropies)),
-        "max_entropy": float(np.max(entropies)),
-        "min_entropy": float(np.min(entropies)),
+        "mean_entropy": safe_stat(entropies, np.mean),
+        "std_entropy": safe_stat(entropies, np.std),
+        "max_entropy": safe_stat(entropies, np.max),
+        "min_entropy": safe_stat(entropies, np.min),
         "max_probs": max_probs,
-        "mean_max_prob": float(np.mean(max_probs))
+        "mean_max_prob": safe_stat(max_probs, np.mean)
     }
 
 
