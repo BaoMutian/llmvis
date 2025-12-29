@@ -387,13 +387,11 @@ async function handleLoadModel() {
 }
 
 /**
- * 检查并加载模型
+ * 检查模型状态（启动时调用，不自动加载）
  */
 async function checkAndLoadModel() {
     try {
-        updateModelStatus('loading', '检查模型...');
-        
-        // 先检查模型是否已加载
+        // 检查模型是否已加载（可能是服务器重启前加载的）
         const infoResponse = await API.getModelInfo();
         
         if (infoResponse.loaded) {
@@ -405,33 +403,16 @@ async function checkAndLoadModel() {
             if (infoResponse.info.model_path) {
                 Elements.modelPath.value = infoResponse.info.model_path;
             }
-            return;
-        }
-        
-        // 未加载，尝试加载默认模型
-        const defaultPath = Elements.modelPath.value.trim();
-        if (defaultPath) {
-            updateModelStatus('loading', '加载模型中...');
-            showLoading(true, '正在加载模型，这可能需要几分钟...');
-            
-            const loadResponse = await API.loadModel(defaultPath);
-            
-            if (loadResponse.success) {
-                AppState.modelLoaded = true;
-                updateModelInfo(loadResponse.model_info);
-                updateModelStatus('ready', '模型就绪');
-            } else {
-                throw new Error(loadResponse.message);
-            }
         } else {
-            updateModelStatus('error', '请输入模型路径');
+            // 未加载模型，提示用户
+            AppState.modelLoaded = false;
+            updateModelStatus('warning', '请加载模型');
+            updateModelInfo(null);
         }
         
     } catch (error) {
-        console.error('Model loading error:', error);
-        updateModelStatus('error', '模型加载失败');
-    } finally {
-        showLoading(false);
+        console.error('Model check error:', error);
+        updateModelStatus('warning', '请加载模型');
     }
 }
 

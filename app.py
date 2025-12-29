@@ -726,16 +726,8 @@ if __name__ == "__main__":
     print("=" * 60)
     print("LLM Inference Visualization Server")
     print("=" * 60)
-    print(f"Model path: {MODEL_PATH}")
-    print("Loading model on startup...")
-
-    # 启动时加载模型
-    if model_service.load_model(MODEL_PATH):
-        print("Model loaded successfully!")
-        print(f"Model info: {model_service.get_model_info()}")
-    else:
-        print("Warning: Failed to load model. You can load it later via API.")
-
+    print("No model loaded at startup.")
+    print("Please enter a model path in the web interface to load a model.")
     print("=" * 60)
     print("Starting Flask server...")
     print("Open http://localhost:5050 in your browser")
